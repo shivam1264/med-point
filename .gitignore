@@ -87,6 +87,7 @@ GoogleService-Info.plist
 
 # Keystore & Certificates
 *.keystore
+!debug.keystore
 *.jks
 *.p12
 *.pem
