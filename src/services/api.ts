@@ -1,11 +1,11 @@
 import axios from 'axios';
 
 /**
- * Shared HTTP client for future MedRoute API integration.
- * No endpoints are called from the UI yet.
+ * Shared HTTP client for MedFlow API integration.
+ * Connects to the local backend server.
  */
 export const apiClient = axios.create({
-  baseURL: 'https://api.medroute.example',
+  baseURL: 'http://10.244.66.235:5000/api',
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json',

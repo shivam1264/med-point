@@ -1,21 +1,117 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   Pressable,
+  TextInput,
+  ActivityIndicator,
+  RefreshControl,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Colors } from '../../constants/colors';
 import { Labels } from '../../constants/labels';
 import { Typography } from '../../constants/typography';
+import { HospitalCard } from '../../components/HospitalCard';
+import { hospitalService, type HospitalSearchParams } from '../../services/hospitalService';
+import type { Hospital } from '../../types';
 
 export function HospitalScreen() {
+  const [hospitals, setHospitals] = useState<Hospital[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState<'all' | 'available' | 'moderate' | 'full'>('all');
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchHospitals = async (params?: HospitalSearchParams) => {
+    try {
+      setError(null);
+      const searchParams: HospitalSearchParams = {
+        ...params,
+        search: searchQuery || undefined,
+        status: selectedStatus !== 'all' ? selectedStatus : undefined,
+      };
+      
+      const response = await hospitalService.getHospitals(searchParams);
+      setHospitals(response.data);
+    } catch (err) {
+      console.error('Error fetching hospitals:', err);
+      setError('Failed to load hospitals. Please try again.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchHospitals();
+  }, []);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchHospitals();
+  };
+
+  const handleSearch = () => {
+    setLoading(true);
+    fetchHospitals();
+  };
+
+  const handleStatusFilter = (status: typeof selectedStatus) => {
+    setSelectedStatus(status);
+    setLoading(true);
+    fetchHospitals({ status: status !== 'all' ? status : undefined });
+  };
+
+  const getHospitalIconColor = (status: string) => {
+    switch (status) {
+      case 'available':
+        return Colors.success;
+      case 'moderate':
+        return Colors.warning;
+      case 'full':
+        return Colors.danger;
+      default:
+        return Colors.danger;
+    }
+  };
+
+  const handleHospitalPress = (hospital: Hospital) => {
+    Alert.alert(
+      hospital.name,
+      `Status: ${hospital.status}\nICU Beds: ${hospital.icuFree}/${hospital.icuTotal}\nGeneral Beds: ${hospital.generalFree}/${hospital.generalTotal}`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Call Hospital', onPress: () => console.log('Call:', hospital.contact?.phone) },
+        { text: 'Get Directions', onPress: () => console.log('Navigate to:', hospital.name) }
+      ]
+    );
+  };
+
+  if (loading && !refreshing) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.danger} />
+          <Text style={styles.loadingText}>Loading hospitals...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.container} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         <View style={styles.header}>
           <Text style={styles.title}>Hospitals</Text>
           <Text style={styles.subtitle}>Find and connect with medical facilities</Text>
@@ -24,162 +120,84 @@ export function HospitalScreen() {
         <View style={styles.searchSection}>
           <View style={styles.searchBar}>
             <Icon name="magnify" size={20} color={Colors.textTertiary} />
-            <Text style={styles.searchPlaceholder}>Search hospitals...</Text>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search hospitals..."
+              placeholderTextColor={Colors.textTertiary}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              onSubmitEditing={handleSearch}
+              returnKeyType="search"
+            />
           </View>
           <Pressable style={styles.filterBtn}>
             <Icon name="filter" size={20} color={Colors.danger} />
           </Pressable>
         </View>
 
+        <View style={styles.filterSection}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <Pressable
+              style={[styles.filterChip, selectedStatus === 'all' && styles.filterChipActive]}
+              onPress={() => handleStatusFilter('all')}
+            >
+              <Text style={[styles.filterChipText, selectedStatus === 'all' && styles.filterChipTextActive]}>
+                All
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.filterChip, selectedStatus === 'available' && styles.filterChipActive]}
+              onPress={() => handleStatusFilter('available')}
+            >
+              <Text style={[styles.filterChipText, selectedStatus === 'available' && styles.filterChipTextActive]}>
+                Available
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.filterChip, selectedStatus === 'moderate' && styles.filterChipActive]}
+              onPress={() => handleStatusFilter('moderate')}
+            >
+              <Text style={[styles.filterChipText, selectedStatus === 'moderate' && styles.filterChipTextActive]}>
+                Moderate
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.filterChip, selectedStatus === 'full' && styles.filterChipActive]}
+              onPress={() => handleStatusFilter('full')}
+            >
+              <Text style={[styles.filterChipText, selectedStatus === 'full' && styles.filterChipTextActive]}>
+                Full
+              </Text>
+            </Pressable>
+          </ScrollView>
+        </View>
+
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>All Hospitals</Text>
+          <Text style={styles.sectionTitle}>All Hospitals ({hospitals.length})</Text>
           
-          <View style={styles.hospitalCard}>
-            <View style={styles.hospitalHeader}>
-              <View style={styles.hospitalIcon}>
-                <Icon name="hospital" size={28} color={Colors.white} />
-              </View>
-              <View style={styles.hospitalInfo}>
-                <Text style={styles.hospitalName}>City General Hospital</Text>
-                <Text style={styles.hospitalAddress}>123 Main Street, Downtown</Text>
-                <View style={styles.hospitalMeta}>
-                  <View style={styles.rating}>
-                    <Icon name="star" size={14} color={Colors.warning} />
-                    <Text style={styles.ratingText}>4.8</Text>
-                  </View>
-                  <Text style={styles.distance}>2.3 km</Text>
-                </View>
-              </View>
-            </View>
-            
-            <View style={styles.hospitalStats}>
-              <View style={styles.statItem}>
-                <Text style={styles.statNumber}>12</Text>
-                <Text style={styles.statLabel}>ICU Beds</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statNumber}>24</Text>
-                <Text style={styles.statLabel}>General Beds</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statNumber}>8</Text>
-                <Text style={styles.statLabel}>OTs</Text>
-              </View>
-            </View>
-
-            <View style={styles.hospitalActions}>
-              <Pressable style={styles.actionBtn}>
-                <Icon name="phone" size={16} color={Colors.danger} />
-                <Text style={styles.actionBtnText}>Call</Text>
-              </Pressable>
-              <Pressable style={styles.actionBtn}>
-                <Icon name="navigation" size={16} color={Colors.danger} />
-                <Text style={styles.actionBtnText}>Navigate</Text>
-              </Pressable>
-              <Pressable style={styles.actionBtn}>
-                <Icon name="information" size={16} color={Colors.danger} />
-                <Text style={styles.actionBtnText}>Details</Text>
+          {error ? (
+            <View style={styles.errorContainer}>
+              <Icon name="alert-circle" size={24} color={Colors.danger} />
+              <Text style={styles.errorText}>{error}</Text>
+              <Pressable style={styles.retryBtn} onPress={onRefresh}>
+                <Text style={styles.retryBtnText}>Retry</Text>
               </Pressable>
             </View>
-          </View>
-
-          <View style={styles.hospitalCard}>
-            <View style={styles.hospitalHeader}>
-              <View style={styles.hospitalIconWarning}>
-                <Icon name="hospital" size={28} color={Colors.white} />
-              </View>
-              <View style={styles.hospitalInfo}>
-                <Text style={styles.hospitalName}>MediCare Center</Text>
-                <Text style={styles.hospitalAddress}>456 Park Avenue, West Side</Text>
-                <View style={styles.hospitalMeta}>
-                  <View style={styles.rating}>
-                    <Icon name="star" size={14} color={Colors.warning} />
-                    <Text style={styles.ratingText}>4.5</Text>
-                  </View>
-                  <Text style={styles.distance}>4.1 km</Text>
-                </View>
-              </View>
+          ) : hospitals.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Icon name="hospital" size={48} color={Colors.textTertiary} />
+              <Text style={styles.emptyText}>No hospitals found</Text>
+              <Text style={styles.emptySubtext}>Try adjusting your search or filters</Text>
             </View>
-            
-            <View style={styles.hospitalStats}>
-              <View style={styles.statItem}>
-                <Text style={styles.statNumber}>3</Text>
-                <Text style={styles.statLabel}>ICU Beds</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statNumber}>8</Text>
-                <Text style={styles.statLabel}>General Beds</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statNumber}>2</Text>
-                <Text style={styles.statLabel}>OTs</Text>
-              </View>
-            </View>
-
-            <View style={styles.hospitalActions}>
-              <Pressable style={styles.actionBtn}>
-                <Icon name="phone" size={16} color={Colors.danger} />
-                <Text style={styles.actionBtnText}>Call</Text>
-              </Pressable>
-              <Pressable style={styles.actionBtn}>
-                <Icon name="navigation" size={16} color={Colors.danger} />
-                <Text style={styles.actionBtnText}>Navigate</Text>
-              </Pressable>
-              <Pressable style={styles.actionBtn}>
-                <Icon name="information" size={16} color={Colors.danger} />
-                <Text style={styles.actionBtnText}>Details</Text>
-              </Pressable>
-            </View>
-          </View>
-
-          <View style={styles.hospitalCard}>
-            <View style={styles.hospitalHeader}>
-              <View style={styles.hospitalIconSuccess}>
-                <Icon name="hospital" size={28} color={Colors.white} />
-              </View>
-              <View style={styles.hospitalInfo}>
-                <Text style={styles.hospitalName}>Emergency Medical Center</Text>
-                <Text style={styles.hospitalAddress}>789 Highway Road, North District</Text>
-                <View style={styles.hospitalMeta}>
-                  <View style={styles.rating}>
-                    <Icon name="star" size={14} color={Colors.warning} />
-                    <Text style={styles.ratingText}>4.9</Text>
-                  </View>
-                  <Text style={styles.distance}>6.7 km</Text>
-                </View>
-              </View>
-            </View>
-            
-            <View style={styles.hospitalStats}>
-              <View style={styles.statItem}>
-                <Text style={styles.statNumber}>18</Text>
-                <Text style={styles.statLabel}>ICU Beds</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statNumber}>32</Text>
-                <Text style={styles.statLabel}>General Beds</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statNumber}>12</Text>
-                <Text style={styles.statLabel}>OTs</Text>
-              </View>
-            </View>
-
-            <View style={styles.hospitalActions}>
-              <Pressable style={styles.actionBtn}>
-                <Icon name="phone" size={16} color={Colors.danger} />
-                <Text style={styles.actionBtnText}>Call</Text>
-              </Pressable>
-              <Pressable style={styles.actionBtn}>
-                <Icon name="navigation" size={16} color={Colors.danger} />
-                <Text style={styles.actionBtnText}>Navigate</Text>
-              </Pressable>
-              <Pressable style={styles.actionBtn}>
-                <Icon name="information" size={16} color={Colors.danger} />
-                <Text style={styles.actionBtnText}>Details</Text>
-              </Pressable>
-            </View>
-          </View>
+          ) : (
+            hospitals.map((hospital) => (
+              <HospitalCard
+                key={hospital.id}
+                hospital={hospital}
+                onPress={() => handleHospitalPress(hospital)}
+              />
+            ))
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -206,7 +224,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  searchPlaceholder: { ...Typography.body, color: Colors.textTertiary, marginLeft: 8 },
+  searchInput: { ...Typography.body, color: Colors.textPrimary, marginLeft: 8, flex: 1 },
   filterBtn: {
     backgroundColor: Colors.card,
     borderRadius: 12,
@@ -215,8 +233,81 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  filterSection: {
+    marginBottom: 20,
+  },
+  filterChip: {
+    backgroundColor: Colors.card,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  filterChipActive: {
+    backgroundColor: Colors.danger,
+    borderColor: Colors.danger,
+  },
+  filterChipText: {
+    ...Typography.small,
+    color: Colors.textSecondary,
+  },
+  filterChipTextActive: {
+    color: Colors.white,
+  },
   section: { marginBottom: 30 },
   sectionTitle: { ...Typography.h3, color: Colors.textPrimary, marginBottom: 15 },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    ...Typography.body,
+    color: Colors.textSecondary,
+    marginTop: 12,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    ...Typography.body,
+    color: Colors.danger,
+    textAlign: 'center',
+    marginTop: 12,
+    marginBottom: 16,
+  },
+  retryBtn: {
+    backgroundColor: Colors.danger,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryBtnText: {
+    ...Typography.body,
+    color: Colors.white,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  emptyText: {
+    ...Typography.h3,
+    color: Colors.textSecondary,
+    marginTop: 16,
+  },
+  emptySubtext: {
+    ...Typography.body,
+    color: Colors.textTertiary,
+    textAlign: 'center',
+    marginTop: 8,
+  },
   hospitalCard: {
     backgroundColor: Colors.card,
     borderRadius: 12,

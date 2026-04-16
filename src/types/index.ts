@@ -15,6 +15,12 @@ export interface Hospital {
   otTotal: number;
   otFree: number;
   specialists: string[];
+  contact?: {
+    phone?: string;
+    email?: string;
+  };
+  emergencyServices?: boolean;
+  rating?: number;
 }
 
 export type CaseSeverity = 'critical' | 'serious' | 'moderate';
