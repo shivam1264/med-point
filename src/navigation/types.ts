@@ -5,6 +5,7 @@ export type RootStackParamList = {
 };
 
 export type AmbulanceTabParamList = {
+  Home: undefined;
   Navigate: undefined;
   Settings: undefined;
 };

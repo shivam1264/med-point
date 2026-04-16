@@ -2,6 +2,7 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Labels } from '../constants/labels';
+import { AmbulanceHomeScreen } from '../screens/ambulance/AmbulanceHomeScreen';
 import { AmbulanceNavScreen } from '../screens/ambulance/AmbulanceNavScreen';
 import { SettingsScreen } from '../screens/shared/SettingsScreen';
 import { tabScreenOptions } from './headerStyles';
@@ -12,6 +13,14 @@ const Tab = createBottomTabNavigator<AmbulanceTabParamList>();
 export function AmbulanceTabs() {
   return (
     <Tab.Navigator screenOptions={{ ...tabScreenOptions, headerShown: false }}>
+      <Tab.Screen
+        name="Home"
+        component={AmbulanceHomeScreen}
+        options={{
+          tabBarLabel: Labels.home,
+          tabBarIcon: ({ color, size }) => <Icon name="home" size={size} color={color} />,
+        }}
+      />
       <Tab.Screen
         name="Navigate"
         component={AmbulanceNavScreen}
