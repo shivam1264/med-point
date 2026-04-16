@@ -66,4 +66,4 @@ export interface FamilyPatient {
   timeline: TimelineItem[];
 }
 
-export type AuthRole = 'dispatcher' | 'ambulance' | 'hospital' | 'family';
+export type AuthRole = 'ambulance' | 'family';

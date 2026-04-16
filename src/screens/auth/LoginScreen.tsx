@@ -15,7 +15,7 @@ import { Labels } from '../../constants/labels';
 import { Typography } from '../../constants/typography';
 import { useAuth } from '../../context/AuthContext';
 
-const ROLES: AuthRole[] = ['dispatcher', 'ambulance', 'hospital', 'family'];
+const ROLES: AuthRole[] = ['ambulance', 'family'];
 
 export function LoginScreen() {
   const { login } = useAuth();
