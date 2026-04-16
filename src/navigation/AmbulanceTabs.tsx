@@ -1,42 +1,47 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createStackNavigator } from '@react-navigation/stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { Labels } from '../constants/labels';
 import { AmbulanceHomeScreen } from '../screens/ambulance/AmbulanceHomeScreen';
 import { AmbulanceNavScreen } from '../screens/ambulance/AmbulanceNavScreen';
-import { SettingsScreen } from '../screens/shared/SettingsScreen';
-import { tabScreenOptions } from './headerStyles';
-import type { AmbulanceTabParamList } from './types';
 
-const Tab = createBottomTabNavigator<AmbulanceTabParamList>();
+const Tab = createBottomTabNavigator();
+const Stack = createStackNavigator();
 
-export function AmbulanceTabs() {
+const tabBarStyle = {
+  backgroundColor: '#111',
+  borderTopColor: '#222',
+  paddingBottom: 4,
+  height: 60,
+};
+
+function AmbulanceTabNavigator() {
   return (
-    <Tab.Navigator screenOptions={{ ...tabScreenOptions, headerShown: false }}>
+    <Tab.Navigator
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle,
+        tabBarActiveTintColor: '#C0392B',
+        tabBarInactiveTintColor: '#555',
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+      }}>
       <Tab.Screen
-        name="Home"
+        name="AmbHome"
         component={AmbulanceHomeScreen}
         options={{
-          tabBarLabel: Labels.home,
-          tabBarIcon: ({ color, size }) => <Icon name="home" size={size} color={color} />,
-        }}
-      />
-      <Tab.Screen
-        name="Navigate"
-        component={AmbulanceNavScreen}
-        options={{
-          tabBarLabel: Labels.navigate,
-          tabBarIcon: ({ color, size }) => <Icon name="navigation" size={size} color={color} />,
-        }}
-      />
-      <Tab.Screen
-        name="Settings"
-        component={SettingsScreen}
-        options={{
-          tabBarLabel: Labels.settings,
-          tabBarIcon: ({ color, size }) => <Icon name="cog" size={size} color={color} />,
+          tabBarLabel: 'Dashboard',
+          tabBarIcon: ({ color, size }) => <Icon name="ambulance" size={size} color={color} />,
         }}
       />
     </Tab.Navigator>
+  );
+}
+
+export function AmbulanceTabs() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="AmbTabs" component={AmbulanceTabNavigator} />
+      <Stack.Screen name="AmbulanceNav" component={AmbulanceNavScreen} />
+    </Stack.Navigator>
   );
 }

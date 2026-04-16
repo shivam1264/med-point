@@ -1,161 +1,80 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { VitalsGrid } from '../../components/VitalsGrid';
-import { Colors } from '../../constants/colors';
-import { Labels } from '../../constants/labels';
-import { mockCases } from '../../constants/mockData';
-import { Typography } from '../../constants/typography';
-import type { Vitals } from '../../types';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import type { Emergency } from '../../types';
 
-const JP = { latitude: 23.2599, longitude: 77.4126 };
-const CURRENT = { latitude: 23.25, longitude: 77.42 };
+interface Props {
+  route: { params: { emergency: Emergency } };
+  navigation: any;
+}
 
-type VitalKey = keyof Vitals;
-
-export function AmbulanceNavScreen() {
-  const base = mockCases[0].vitals;
-  const [loading, setLoading] = useState(true);
-  const [arrived, setArrived] = useState(false);
-  const [strings, setStrings] = useState<Record<VitalKey, string>>({
-    hr: String(base.hr),
-    bp: base.bp,
-    spo2: String(base.spo2),
-    gcs: String(base.gcs),
-  });
-
-  const vitals: Vitals = useMemo(
-    () => ({
-      hr: parseInt(strings.hr, 10) || 0,
-      bp: strings.bp,
-      spo2: parseInt(strings.spo2, 10) || 0,
-      gcs: parseInt(strings.gcs, 10) || 0,
-    }),
-    [strings],
-  );
-
-  useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 1000);
-    return () => clearTimeout(t);
-  }, []);
-
-  const onVitalChange = (key: VitalKey, value: string) => {
-    setStrings(s => ({ ...s, [key]: value }));
-  };
-
-  const onArrived = () => {
-    Alert.alert(Labels.arrivedTitle, Labels.arrivedMessage, [
-      { text: Labels.cancel, style: 'cancel' },
-      {
-        text: Labels.ok,
-        onPress: () => setArrived(true),
-      },
-    ]);
-  };
-
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.safe} edges={['top']}>
-        <View style={styles.loader}>
-          <ActivityIndicator size="large" color={Colors.danger} />
-        </View>
-      </SafeAreaView>
-    );
-  }
+export function AmbulanceNavScreen({ route, navigation }: Props) {
+  const { emergency } = route.params;
+  const patLat = emergency.location?.lat ?? 23.25;
+  const patLng = emergency.location?.lng ?? 77.41;
+  const hospLat = emergency.hospitalLat ?? 23.21;
+  const hospLng = emergency.hospitalLng ?? 77.44;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <View style={styles.header}>
-          <Text style={styles.title}>{Labels.navigation}</Text>
-          <View style={styles.etaBadge}>
-            <Text style={styles.etaText}>{Labels.navEtaBadge}</Text>
-          </View>
+    <SafeAreaView style={styles.safe}>
+      <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+        <Icon name="arrow-left" size={22} color="#fff" />
+      </TouchableOpacity>
+
+      <MapView
+        style={styles.map}
+        provider={PROVIDER_GOOGLE}
+        showsUserLocation
+        initialRegion={{ latitude: patLat, longitude: patLng, latitudeDelta: 0.06, longitudeDelta: 0.06 }}>
+        <Marker coordinate={{ latitude: patLat, longitude: patLng }} title="Patient">
+          <View style={styles.patientMarker}><Icon name="account" size={20} color="#fff" /></View>
+        </Marker>
+        <Marker coordinate={{ latitude: hospLat, longitude: hospLng }} title={emergency.hospitalName || 'Hospital'}>
+          <View style={styles.hospMarker}><Icon name="hospital-building" size={20} color="#fff" /></View>
+        </Marker>
+        <Polyline
+          coordinates={[{ latitude: patLat, longitude: patLng }, { latitude: hospLat, longitude: hospLng }]}
+          strokeColor="#C0392B" strokeWidth={3} lineDashPattern={[8, 4]} />
+      </MapView>
+
+      <View style={styles.infoCard}>
+        <View style={styles.phase}>
+          <View style={[styles.phaseStep, styles.phaseActive]}><Text style={styles.phaseStepText}>1</Text></View>
+          <Text style={styles.phaseLabel}>Reach Patient</Text>
+          <View style={styles.phaseLine} />
+          <View style={styles.phaseStep}><Text style={styles.phaseStepText}>2</Text></View>
+          <Text style={styles.phaseLabel}>To Hospital</Text>
         </View>
-
-        <MapView
-          style={styles.map}
-          initialRegion={{
-            latitude: 23.255,
-            longitude: 77.415,
-            latitudeDelta: 0.06,
-            longitudeDelta: 0.06,
-          }}>
-          <Marker coordinate={CURRENT} title="Current" tracksViewChanges={false}>
-            <View style={[styles.marker, { backgroundColor: Colors.info }]} />
-          </Marker>
-          <Marker coordinate={JP} title="JP Hospital" tracksViewChanges={false}>
-            <View style={[styles.marker, { backgroundColor: Colors.danger }]} />
-          </Marker>
-        </MapView>
-
-        <View style={styles.preNote}>
-          <Text style={styles.preNoteText}>
-            {Labels.preNotificationTitle} · {Labels.specialistReady}
-          </Text>
-        </View>
-
-        <Text style={styles.section}>{Labels.patientVitalsInput}</Text>
-        <VitalsGrid
-          vitals={vitals}
-          editable
-          stringValues={strings}
-          onStringChange={onVitalChange}
-        />
-
-        <Pressable
-          style={[styles.arrivedBtn, arrived && { opacity: 0.6 }]}
-          onPress={onArrived}
-          disabled={arrived}>
-          <Text style={styles.arrivedText}>{Labels.arrivedAtHospital}</Text>
-        </Pressable>
-      </ScrollView>
+        {emergency.hospitalName && (
+          <View style={styles.row}><Icon name="hospital-building" size={16} color="#888" /><Text style={styles.rowText}>{emergency.hospitalName}</Text></View>
+        )}
+        {emergency.hospitalAddress && (
+          <View style={styles.row}><Icon name="map-marker" size={16} color="#888" /><Text style={styles.rowText}>{emergency.hospitalAddress}</Text></View>
+        )}
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
-  scroll: { padding: 16, paddingBottom: 32 },
-  loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  title: { ...Typography.h1, color: Colors.textPrimary },
-  etaBadge: {
-    backgroundColor: Colors.dangerLight,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
-    borderWidth: 0.5,
-    borderColor: Colors.border,
+  safe: { flex: 1, backgroundColor: '#000' },
+  map: { flex: 1 },
+  backBtn: {
+    position: 'absolute', top: 56, left: 16, zIndex: 10,
+    width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.7)',
+    alignItems: 'center', justifyContent: 'center'
   },
-  etaText: { ...Typography.small, color: Colors.dangerDark, fontWeight: '600' },
-  map: { height: 180, width: '100%', borderRadius: 12, overflow: 'hidden', marginBottom: 12 },
-  marker: { width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: Colors.white },
-  preNote: {
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: Colors.success,
-    backgroundColor: Colors.successLight,
-    padding: 12,
-    marginBottom: 16,
-  },
-  preNoteText: { ...Typography.body, color: Colors.successDark },
-  section: { ...Typography.h3, color: Colors.textPrimary, marginBottom: 8 },
-  arrivedBtn: {
-    backgroundColor: Colors.danger,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  arrivedText: { ...Typography.h2, color: Colors.white },
+  patientMarker: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F39C12', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
+  hospMarker: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#C0392B', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
+  infoCard: { backgroundColor: '#1A1A1A', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 32 },
+  phase: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 6 },
+  phaseStep: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#2A2A2A', alignItems: 'center', justifyContent: 'center' },
+  phaseActive: { backgroundColor: '#C0392B' },
+  phaseStepText: { color: '#fff', fontWeight: '700', fontSize: 12 },
+  phaseLabel: { fontSize: 13, color: '#888', marginRight: 6 },
+  phaseLine: { flex: 1, height: 2, backgroundColor: '#2A2A2A' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  rowText: { flex: 1, fontSize: 13, color: '#ccc' },
 });

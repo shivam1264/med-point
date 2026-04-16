@@ -1,273 +1,156 @@
 const Hospital = require('../models/Hospital');
 
 // @desc    Get all hospitals
-// @route   GET /api/hospitals
-// @access  Public
 const getHospitals = async (req, res) => {
   try {
-    const { 
-      search, 
-      status, 
-      sortBy = 'name', 
-      order = 'asc',
-      page = 1,
-      limit = 10
-    } = req.query;
-
-    // Build query
+    const { search, status, sortBy = 'name', order = 'asc', page = 1, limit = 10 } = req.query;
     let query = {};
-
-    // Search functionality
     if (search) {
       query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { address: { $regex: search, $options: 'i' } },
-        { specialists: { $in: [new RegExp(search, 'i')] } }
+        { hospitalName: { $regex: search, $options: 'i' } },
+        { address: { $regex: search, $options: 'i' } }
       ];
     }
-
-    // Filter by status
-    if (status) {
-      query.status = status;
-    }
-
-    // Sorting options
-    const sortOptions = {};
-    const allowedSortFields = ['name', 'status', 'rating', 'createdAt'];
-    const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'name';
-    sortOptions[sortField] = order === 'desc' ? -1 : 1;
-
-    // Pagination
-    const skip = (page - 1) * limit;
-
+    if (status) query.status = status;
     const hospitals = await Hospital.find(query)
-      .sort(sortOptions)
-      .skip(skip)
+      .sort({ [sortBy]: order === 'desc' ? -1 : 1 })
+      .skip((page - 1) * limit)
       .limit(parseInt(limit));
-
     const total = await Hospital.countDocuments(query);
-
-    res.json({
-      success: true,
-      count: hospitals.length,
-      total,
-      pages: Math.ceil(total / limit),
-      currentPage: parseInt(page),
-      data: hospitals
-    });
+    res.json({ success: true, count: hospitals.length, total, data: hospitals });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching hospitals',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// @desc    Get single hospital by ID
-// @route   GET /api/hospitals/:id
-// @access  Public
 const getHospitalById = async (req, res) => {
   try {
     const hospital = await Hospital.findById(req.params.id);
-
-    if (!hospital) {
-      return res.status(404).json({
-        success: false,
-        message: 'Hospital not found'
-      });
-    }
-
-    res.json({
-      success: true,
-      data: hospital
-    });
+    if (!hospital) return res.status(404).json({ success: false, message: 'Hospital not found' });
+    res.json({ success: true, data: hospital });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching hospital',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// @desc    Create a new hospital
-// @route   POST /api/hospitals
-// @access  Public
 const createHospital = async (req, res) => {
   try {
     const hospital = new Hospital(req.body);
     await hospital.save();
-
-    res.status(201).json({
-      success: true,
-      message: 'Hospital created successfully',
-      data: hospital
-    });
+    res.status(201).json({ success: true, data: hospital });
   } catch (error) {
-    if (error.name === 'ValidationError') {
-      const errors = Object.values(error.errors).map(err => err.message);
-      return res.status(400).json({
-        success: false,
-        message: 'Validation Error',
-        errors
-      });
-    }
-
-    res.status(500).json({
-      success: false,
-      message: 'Error creating hospital',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// @desc    Update hospital
-// @route   PUT /api/hospitals/:id
-// @access  Public
 const updateHospital = async (req, res) => {
   try {
-    const hospital = await Hospital.findById(req.params.id);
-
-    if (!hospital) {
-      return res.status(404).json({
-        success: false,
-        message: 'Hospital not found'
-      });
-    }
-
-    const updatedHospital = await Hospital.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true, runValidators: true }
-    );
-
-    res.json({
-      success: true,
-      message: 'Hospital updated successfully',
-      data: updatedHospital
-    });
+    const hospital = await Hospital.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!hospital) return res.status(404).json({ success: false, message: 'Hospital not found' });
+    res.json({ success: true, data: hospital });
   } catch (error) {
-    if (error.name === 'ValidationError') {
-      const errors = Object.values(error.errors).map(err => err.message);
-      return res.status(400).json({
-        success: false,
-        message: 'Validation Error',
-        errors
-      });
-    }
-
-    res.status(500).json({
-      success: false,
-      message: 'Error updating hospital',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// @desc    Delete hospital
-// @route   DELETE /api/hospitals/:id
-// @access  Public
 const deleteHospital = async (req, res) => {
   try {
-    const hospital = await Hospital.findById(req.params.id);
-
-    if (!hospital) {
-      return res.status(404).json({
-        success: false,
-        message: 'Hospital not found'
-      });
-    }
-
     await Hospital.findByIdAndDelete(req.params.id);
-
-    res.json({
-      success: true,
-      message: 'Hospital deleted successfully'
-    });
+    res.json({ success: true, message: 'Hospital deleted' });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error deleting hospital',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// @desc    Get hospitals by location (nearby)
-// @route   GET /api/hospitals/nearby
-// @access  Public
 const getNearbyHospitals = async (req, res) => {
   try {
-    const { lat, lng, maxDistance = 10000 } = req.query; // maxDistance in meters
+    const { lat, lng, maxDistance, onlyWithBeds } = req.query;
+    if (!lat || !lng) return res.status(400).json({ success: false, message: 'lat and lng required' });
 
-    if (!lat || !lng) {
-      return res.status(400).json({
-        success: false,
-        message: 'Latitude and longitude are required'
-      });
+    // 1. Diagnostics: Log what's in the DB
+    const all = await Hospital.find({}).limit(1).lean();
+    if (all.length > 0) {
+      console.log('📍 Sample Hospital Coords:', all[0].location?.coordinates, ' hospitalName:', all[0].hospitalName);
     }
 
-    const hospitals = await Hospital.find({
-      coordinates: {
-        $near: {
-          $geometry: {
-            type: 'Point',
-            coordinates: [parseFloat(lng), parseFloat(lat)]
-          },
-          $maxDistance: parseInt(maxDistance)
+    // 2. Clear auto-migration with lean() to be safe
+    const legacy = await Hospital.find({ 
+      $or: [
+        { location: { $exists: false } }, 
+        { hospitalName: { $exists: false } } 
+      ] 
+    }).lean();
+    
+    if (legacy.length > 0) {
+      console.log(`🔧 Migrating ${legacy.length} legacy records...`);
+      for (const h of legacy) {
+        const updates = {};
+        if (!h.hospitalName && h.name) updates.hospitalName = h.name;
+        
+        // Smart Coordinate Extraction
+        let oldLat, oldLng;
+        if (h.coordinates && typeof h.coordinates === 'object' && !Array.isArray(h.coordinates)) {
+          oldLat = h.coordinates.lat;
+          oldLng = h.coordinates.lng;
+        } else if (Array.isArray(h.coordinates)) {
+          oldLng = h.coordinates[0];
+          oldLat = h.coordinates[1];
+        } else {
+          oldLat = h.lat;
+          oldLng = h.lng;
+        }
+
+        // Only update if we found valid non-default coordinates or if location is missing
+        if (oldLat && oldLng) {
+          updates.location = { 
+            type: 'Point', 
+            coordinates: [parseFloat(String(oldLng)), parseFloat(String(oldLat))] 
+          };
+        }
+        
+        if (Object.keys(updates).length > 0) {
+          await Hospital.findByIdAndUpdate(h._id, { $set: updates });
+          console.log(`✅ Migrated: ${h.hospitalName || h.name || h._id} -> [${oldLng}, ${oldLat}]`);
         }
       }
-    }).limit(20);
+    }
 
-    res.json({
-      success: true,
-      count: hospitals.length,
-      data: hospitals
-    });
+    // 3. Perform the search with a very large radius to see IF anything exists
+    const radius = maxDistance ? parseInt(String(maxDistance)) : 500000; // 500km default
+
+    const pipeline = [
+      {
+        $geoNear: {
+          near: { type: 'Point', coordinates: [parseFloat(String(lng)), parseFloat(String(lat))] },
+          distanceField: 'distanceKm',
+          distanceMultiplier: 0.001,
+          spherical: true,
+          maxDistance: radius,
+          query: onlyWithBeds === 'true' ? {
+            $or: [{ icuAvailable: { $gt: 0 } }, { availableBeds: { $gt: 0 } }]
+          } : {}
+        }
+      },
+      { $sort: { distanceKm: 1 } },
+      { $limit: onlyWithBeds === 'true' ? 5 : 20 }
+    ];
+
+    const hospitals = await Hospital.aggregate(pipeline);
+    console.log(`📍 Search [${lng}, ${lat}] Result: ${hospitals.length} hospitals`);
+    
+    res.json({ success: true, count: hospitals.length, data: hospitals });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error finding nearby hospitals',
-      error: error.message
-    });
+    console.error('❌ GeoNear Error:', error.message);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// @desc    Update hospital bed availability
-// @route   PATCH /api/hospitals/:id/beds
-// @access  Public
 const updateBedAvailability = async (req, res) => {
   try {
-    const { icuFree, generalFree, otFree } = req.body;
-
-    const hospital = await Hospital.findById(req.params.id);
-
-    if (!hospital) {
-      return res.status(404).json({
-        success: false,
-        message: 'Hospital not found'
-      });
-    }
-
-    // Update bed availability
-    if (icuFree !== undefined) hospital.beds.icu.free = icuFree;
-    if (generalFree !== undefined) hospital.beds.general.free = generalFree;
-    if (otFree !== undefined) hospital.beds.ot.free = otFree;
-
-    await hospital.save();
-
-    res.json({
-      success: true,
-      message: 'Bed availability updated successfully',
-      data: hospital
-    });
+    const hospital = await Hospital.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.json({ success: true, data: hospital });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error updating bed availability',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 

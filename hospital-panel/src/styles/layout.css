@@ -1,0 +1,35 @@
+.layout { display: flex; min-height: 100vh; }
+
+/* ── Sidebar ── */
+.sidebar {
+  width: 240px; background: #111; border-right: 1px solid #1F1F1F;
+  display: flex; flex-direction: column; padding: 20px 12px;
+  position: fixed; top: 0; left: 0; bottom: 0; z-index: 100;
+}
+.sidebar-brand { display: flex; align-items: center; gap: 10px; padding: 0 8px; margin-bottom: 32px; }
+.brand-emoji { font-size: 28px; }
+.brand-name { font-size: 18px; font-weight: 800; color: #EAEAEA; }
+.brand-sub { font-size: 11px; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
+
+.sidebar-nav { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  border-radius: 10px; font-size: 14px; font-weight: 500; color: #777;
+  text-decoration: none; transition: all .15s; cursor: pointer;
+}
+.nav-item:hover { background: #1A1A1A; color: #EAEAEA; }
+.nav-item.active { background: #C0392B !important; color: #fff !important; font-weight: 600; }
+.nav-icon { font-size: 16px; }
+
+.sidebar-footer { padding-top: 16px; border-top: 1px solid #1F1F1F; }
+.admin-info { margin-bottom: 10px; }
+.admin-name { font-size: 13px; font-weight: 600; color: #EAEAEA; }
+.admin-email { font-size: 11px; color: #666; margin-top: 2px; }
+.logout-btn {
+  width: 100%; padding: 9px; background: transparent; border: 1px solid #2A2A2A;
+  border-radius: 10px; color: #777; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all .15s; font-family: inherit;
+}
+.logout-btn:hover { border-color: #C0392B; color: #C0392B; }
+
+.main-content { margin-left: 240px; flex: 1; min-height: 100vh; background: #0D0D0D; }

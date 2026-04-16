@@ -1,34 +1,46 @@
 const express = require('express');
 const router = express.Router();
-const {
-  getHospitals,
-  getHospitalById,
+const Hospital = require('../models/Hospital');
+const { protect, hospitalAdminOnly } = require('../middleware/auth');
+
+// Helper: distance in km
+const getDistanceKm = (lat1, lng1, lat2, lng2) => {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+};
+
+const { 
+  getNearbyHospitals, 
+  getHospitals, 
+  getHospitalById, 
   createHospital,
+  updateBedAvailability, 
   updateHospital,
-  deleteHospital,
-  getNearbyHospitals,
-  updateBedAvailability
+  deleteHospital 
 } = require('../controllers/hospitalController');
 
-// GET all hospitals
-router.get('/', getHospitals);
-
-// GET nearby hospitals
+// GET /api/hospitals/nearby?lat=&lng=&limit=5
 router.get('/nearby', getNearbyHospitals);
 
-// GET single hospital
+// GET /api/hospitals
+router.get('/', getHospitals);
+
+// GET /api/hospitals/:id
 router.get('/:id', getHospitalById);
 
-// POST create hospital
-router.post('/', createHospital);
+// POST /api/hospitals
+router.post('/', protect, hospitalAdminOnly, createHospital);
 
-// PUT update hospital
-router.put('/:id', updateHospital);
+// PATCH /api/hospitals/:id/beds — hospital admin updates bed counts
+router.patch('/:id/beds', protect, hospitalAdminOnly, updateBedAvailability);
 
-// PATCH update bed availability
-router.patch('/:id/beds', updateBedAvailability);
+// PUT /api/hospitals/:id — full update
+router.put('/:id', protect, hospitalAdminOnly, updateHospital);
 
-// DELETE hospital
-router.delete('/:id', deleteHospital);
+// DELETE /api/hospitals/:id
+router.delete('/:id', protect, hospitalAdminOnly, deleteHospital);
 
 module.exports = router;

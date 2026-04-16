@@ -1,51 +1,111 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 const Hospital = require('./models/Hospital');
+const HospitalAdmin = require('./models/HospitalAdmin');
+const Doctor = require('./models/Doctor');
+const User = require('./models/User');
 
 const hospitals = [
-  { hospitalName: "AIIMS Bhopal", fullName: "All India Institute of Medical Sciences Bhopal", type: "Government – Teaching & Research", category: "Super Speciality", area: "Saket Nagar", address: "AIIMS Campus Rd, AIIMS Campus, Saket Nagar, Habib Ganj, Bhopal, MP 462020", emergency: true, phone: "+91-755-298-2607", totalBeds: 960, availableBeds: null, icuBeds: 100, icuAvailable: null, ventilators: 80, ventilatorsAvailable: null, specialties: ["General Medicine", "Surgery", "Cardiology", "Neurology", "Oncology", "Orthopedics", "Pediatrics", "Gynecology", "Radiology", "Psychiatry"], accreditation: ["NABH", "MCI"], ayushmanEmpanelled: true, coordinates: { lat: 23.2094, lng: 77.4582 }, googlePlaceId: "ChIJ19uXWs1DfDkRwEhb7dOe29s", rating: 4.0, ratingCount: 1895, open24x7: true, status: "green" },
-  { hospitalName: "Hamidia Hospital", fullName: "Hamidia Hospital (Gandhi Medical College)", type: "Government – Teaching", category: "Tertiary Care", area: "Royal Market", address: "Sultania Rd, Royal Market, Bhopal, MP 462001", emergency: true, phone: "+91-755-254-0590", totalBeds: 1500, availableBeds: null, icuBeds: 120, icuAvailable: null, ventilators: 100, ventilatorsAvailable: null, specialties: ["General Medicine", "Surgery", "Orthopedics", "Gynecology", "Pediatrics", "Cardiology", "Neurology", "Emergency Medicine", "ENT", "Ophthalmology"], accreditation: ["MCI"], ayushmanEmpanelled: true, coordinates: { lat: 23.2592, lng: 77.3942 }, googlePlaceId: "ChIJD0xmDxtofDkRjXtQa8xpj9w", rating: 3.2, ratingCount: 783, open24x7: true, status: "green" },
-  { hospitalName: "Gandhi Medical College", fullName: "Gandhi Medical College & Hospital", type: "Government – Teaching", category: "Tertiary Care", area: "Royal Market", address: "Sultania Rd, Near Hamidia Hospital, Royal Market, Bhopal, MP 462001", emergency: true, phone: "+91-755-254-0590", totalBeds: 1000, availableBeds: null, icuBeds: 80, icuAvailable: null, ventilators: 60, ventilatorsAvailable: null, specialties: ["General Medicine", "Surgery", "Pathology", "Radiology", "Dermatology", "Plastic Surgery", "Burns", "Oncology"], accreditation: ["MCI"], ayushmanEmpanelled: true, coordinates: { lat: 23.2599, lng: 77.3910 }, googlePlaceId: "ChIJJ8k_JBtofDkROt6xEGgkdnY", rating: 4.3, ratingCount: 1034, open24x7: true, status: "green" },
-  { hospitalName: "BMHRC", fullName: "Bhopal Memorial Hospital and Research Centre", type: "Government – Research", category: "Super Speciality", area: "Bhanpur", address: "Bhopal Bypass Rd, BMHRC Campus, Bhanpur, Bhopal, MP 462038", emergency: true, phone: "+91-755-274-2212", totalBeds: 350, availableBeds: null, icuBeds: 40, icuAvailable: null, ventilators: 30, ventilatorsAvailable: null, specialties: ["Oncology", "Nephrology", "Cardiology", "Neurology", "Respiratory Medicine", "Pulmonology"], accreditation: ["NABH"], ayushmanEmpanelled: true, coordinates: { lat: 23.2989, lng: 77.4176 }, googlePlaceId: "ChIJTUbPW1ZofDkRSLkc8QFjcI0", rating: 3.9, ratingCount: 442, open24x7: true, status: "green" },
-  { hospitalName: "Bansal Hospital", fullName: "Bansal Hospital Bhopal", type: "Private", category: "Multi-Speciality", area: "Shahpura", address: "Chuna Bhatti Rd, Manisha Market, Sector C, Shahpura, Bhopal, MP 462039", emergency: true, phone: "+91-755-408-6000", totalBeds: 400, availableBeds: null, icuBeds: 50, icuAvailable: null, ventilators: 30, ventilatorsAvailable: null, specialties: ["Cardiology", "Neurology", "Orthopedics", "Urology", "Gastroenterology", "Oncology", "Laparoscopic Surgery", "Nephrology"], accreditation: ["NABH"], ayushmanEmpanelled: true, coordinates: { lat: 23.1995, lng: 77.4199 }, googlePlaceId: "ChIJjdeUmbxDfDkRgkow8TwzAXo", rating: 4.0, ratingCount: 3000, open24x7: true, status: "green" },
-  { hospitalName: "Chirayu Hospital", fullName: "Chirayu Medical College & Hospital", type: "Private – Teaching", category: "Multi-Speciality", area: "Bairagarh", address: "Bhopal Byp, Bhainsakhedi, Bairagarh, Bhopal, MP 462030", emergency: true, phone: "+91-755-270-9101", totalBeds: 750, availableBeds: null, icuBeds: 80, icuAvailable: null, ventilators: 50, ventilatorsAvailable: null, specialties: ["General Medicine", "Surgery", "Cardiology", "Pediatrics", "Gynecology", "Orthopedics", "Radiology", "Neurology"], accreditation: ["NABH", "MCI"], ayushmanEmpanelled: true, coordinates: { lat: 23.2690, lng: 77.3081 }, googlePlaceId: "ChIJffbp_mxnfDkRk92T6rsidWs", rating: 3.3, ratingCount: 660, open24x7: true, status: "green" },
-  { hospitalName: "Apollo Sage Hospital", fullName: "ApolloSage Hospitals Bhopal", type: "Private", category: "Multi-Speciality", area: "Bawadiya Kalan", address: "Bawadiya Kalan, Salaiya, Bhopal, MP 462026", emergency: true, phone: "+91-93039-72510", totalBeds: 350, availableBeds: null, icuBeds: 60, icuAvailable: null, ventilators: 40, ventilatorsAvailable: null, specialties: ["Cardiology", "Organ Transplant", "Neurology", "Radiology", "Oncology", "Orthopedics", "Maternity", "Laparoscopy"], accreditation: ["NABH"], ayushmanEmpanelled: false, coordinates: { lat: 23.1776, lng: 77.4424 }, googlePlaceId: "ChIJq6pqJpFDfDkRKKXAC8PIw6w", rating: 4.5, ratingCount: 3500, open24x7: true, status: "green" },
-  { hospitalName: "People's Hospital", fullName: "People's Hospital Bhopal", type: "Private – Teaching", category: "Multi-Speciality", area: "Bhanpur", address: "Ayodhya Bypass Rd, Peoples Campus, Bhanpur, Bhopal, MP 462037", emergency: true, phone: null, totalBeds: 700, availableBeds: null, icuBeds: 80, icuAvailable: null, ventilators: 50, ventilatorsAvailable: null, specialties: ["Neonatology", "Pediatrics", "Cardiology", "Orthopedics", "Neurology", "Gastroenterology", "Gynecology", "Oncology"], accreditation: ["NABH"], ayushmanEmpanelled: true, coordinates: { lat: 23.3011, lng: 77.4246 }, googlePlaceId: "ChIJ6y5SaHhpfDkRhNepztICD5E", rating: 4.5, ratingCount: 961, open24x7: true, status: "green" },
-  { hospitalName: "JP Hospital", fullName: "Jai Prakash District Hospital", type: "Government", category: "District Hospital", area: "Shivaji Nagar", address: "Shivaji Nagar, Bhopal, MP 462003", emergency: true, phone: "+91-755-266-0248", totalBeds: 300, availableBeds: null, icuBeds: 30, icuAvailable: null, ventilators: 20, ventilatorsAvailable: null, specialties: ["General Medicine", "Surgery", "Obstetrics", "Gynecology", "Pediatrics", "Emergency Care"], accreditation: [], ayushmanEmpanelled: true, coordinates: { lat: 23.2301, lng: 77.4178 }, googlePlaceId: "ChIJPZXThxJDfDkRKC5HCN6cj8M", rating: 3.6, ratingCount: 424, open24x7: true, status: "amber" },
-  { hospitalName: "Narmada Trauma Centre", fullName: "Narmada Trauma Centre Pvt Ltd", type: "Private", category: "Multi-Speciality & Trauma", area: "Arera Colony", address: "E3/23, Arera Colony, Bhopal, MP 462016", emergency: true, phone: "+91-755-404-0000", totalBeds: 200, availableBeds: null, icuBeds: 30, icuAvailable: null, ventilators: 20, ventilatorsAvailable: null, specialties: ["Trauma Surgery", "Orthopedics", "Neurosurgery", "Emergency Medicine", "General Surgery", "Critical Care"], accreditation: [], ayushmanEmpanelled: true, coordinates: { lat: 23.2177, lng: 77.4392 }, googlePlaceId: "ChIJZYkIA09CfDkRGy7f3_GIe3g", rating: 4.1, ratingCount: 515, open24x7: true, status: "green" },
-  { hospitalName: "Lake City Hospital", fullName: "Lake City Hospital", type: "Private", category: "Multi-Speciality", area: "Kasturba Nagar", address: "B-27, Near Chetak Bridge, Sector B, Kasturba Nagar, Bhopal, MP 462011", emergency: true, phone: "+91-755-428-8656", totalBeds: 150, availableBeds: null, icuBeds: 20, icuAvailable: null, ventilators: 12, ventilatorsAvailable: null, specialties: ["General Surgery", "Gynecology", "Laparoscopy", "Burns", "Plastic Surgery", "Cleft Lip", "Dermatology", "Pediatrics"], accreditation: [], ayushmanEmpanelled: true, coordinates: { lat: 23.2324, lng: 77.4399 }, googlePlaceId: "ChIJtSlT3mlCfDkRhFqoeRR_FZk", rating: 3.7, ratingCount: 199, open24x7: true, status: "green" },
-  { hospitalName: "JK Hospital", fullName: "JK Hospital Medical Research Center", type: "Private", category: "Multi-Speciality", area: "Kolar Road", address: "Sarvadharam C Sector, Shirdipuram, Kolar Rd, Bhopal, MP 462042", emergency: true, phone: "+91-755-408-7000", totalBeds: 300, availableBeds: null, icuBeds: 30, icuAvailable: null, ventilators: 20, ventilatorsAvailable: null, specialties: ["Orthopedics", "ENT", "Ophthalmology", "Gynecology", "Pediatrics", "Radiology", "General Surgery"], accreditation: [], ayushmanEmpanelled: true, coordinates: { lat: 23.1790, lng: 77.4279 }, googlePlaceId: "ChIJ-___vglDfDkR27uOWLo6cwo", rating: 3.3, ratingCount: 594, open24x7: true, status: "green" },
-  { hospitalName: "Sultania Zanana Hospital", fullName: "Sultaniya Zanana Hospital (Women & Children)", type: "Government", category: "Speciality – Women & Children", area: "Jahangirabad", address: "Sultania Rd, Near Kali Mandir, Quasipura, Jahangirabad, Bhopal, MP 462001", emergency: true, phone: "+91-755-273-0124", totalBeds: 400, availableBeds: null, icuBeds: 30, icuAvailable: null, ventilators: 15, ventilatorsAvailable: null, specialties: ["Obstetrics", "Gynecology", "Pediatrics", "Neonatal Care", "High-Risk Pregnancy"], accreditation: [], ayushmanEmpanelled: true, coordinates: { lat: 23.2561, lng: 77.4093 }, googlePlaceId: "ChIJy6GCyCJofDkROo6xjXjPtQE", rating: 3.4, ratingCount: 109, open24x7: true, status: "amber" },
-  { hospitalName: "Kamla Nehru Hospital", fullName: "Kamla Nehru Hospital (Cancer)", type: "Government – Teaching", category: "Speciality – Cancer", area: "Royal Market", address: "VIP Road, Opp Hamidia Hospital, Royal Market, Peer Gate, Bhopal, MP 462001", emergency: false, phone: "+91-755-273-9101", totalBeds: 200, availableBeds: null, icuBeds: 15, icuAvailable: null, ventilators: 10, ventilatorsAvailable: null, specialties: ["Oncology", "Cancer Surgery", "Radiotherapy", "Gastroenterology"], accreditation: [], ayushmanEmpanelled: true, coordinates: { lat: 23.2586, lng: 77.3925 }, googlePlaceId: "ChIJRdNCcRtofDkRAbwgUuD57_s", rating: 3.6, ratingCount: 66, open24x7: true, status: "amber" },
-  { hospitalName: "JN Cancer Hospital", fullName: "Jawaharlal Nehru Cancer Hospital and Research Centre", type: "Government", category: "Speciality – Cancer", area: "Idgah Hills", address: "P.B. No.32, Cancer Hospital Rd, Idgah Hills, Bhopal, MP 462001", emergency: false, phone: "+91-755-266-5720", totalBeds: 250, availableBeds: null, icuBeds: 20, icuAvailable: null, ventilators: 15, ventilatorsAvailable: null, specialties: ["Oncology", "Radiotherapy", "Chemotherapy", "Surgical Oncology", "Cancer Research"], accreditation: [], ayushmanEmpanelled: true, coordinates: { lat: 23.2730, lng: 77.3806 }, googlePlaceId: "ChIJp3oiykFofDkR2BkHS8nQ4R0", rating: 3.9, ratingCount: 508, open24x7: false, status: "green" },
-  { hospitalName: "Navodaya Cancer Hospital", fullName: "Navodaya Cancer Hospital and Research Centre", type: "Private", category: "Speciality – Cancer", area: "Indrapuri", address: "Nizamuddin Rd, Opp BHEL Gate #1, Indrapuri B Sector, Bhopal, MP 462022", emergency: false, phone: "+91-83054-66883", totalBeds: 100, availableBeds: null, icuBeds: 10, icuAvailable: null, ventilators: 8, ventilatorsAvailable: null, specialties: ["Medical Oncology", "Surgical Oncology", "Chemotherapy", "Radiotherapy"], accreditation: [], ayushmanEmpanelled: true, coordinates: { lat: 23.2530, lng: 77.4617 }, googlePlaceId: "ChIJGQPRigZCfDkRRAi3PGxjvjM", rating: 3.3, ratingCount: 133, open24x7: false, status: "green" },
-  { hospitalName: "Sharda Hospital", fullName: "Sharda Hospital", type: "Private", category: "Multi-Speciality", area: "Aradhana Nagar", address: "189, Geetanjali Rd, Aradhana Nagar, Bhopal, MP 462003", emergency: true, phone: "+91-755-277-4378", totalBeds: 100, availableBeds: null, icuBeds: 15, icuAvailable: null, ventilators: 10, ventilatorsAvailable: null, specialties: ["General Surgery", "Laparoscopy", "Gastroenterology", "Dermatology", "Anorectal Surgery"], accreditation: [], ayushmanEmpanelled: false, coordinates: { lat: 23.2215, lng: 77.3960 }, googlePlaceId: "ChIJJead9MNCfDkRCMgHOx6Y0pg", rating: 4.3, ratingCount: 239, open24x7: true, status: "green" },
-  { hospitalName: "Noble Hospital", fullName: "Noble Multispeciality Hospital", type: "Private", category: "Multi-Speciality", area: "Misrod", address: "269/1, Near Capital Mall, Misrod, Bhopal, MP 462026", emergency: true, phone: "+91-755-248-8008", totalBeds: 110, availableBeds: null, icuBeds: 20, icuAvailable: null, ventilators: 12, ventilatorsAvailable: null, specialties: ["Cardiology", "Orthopedics", "Neurology", "Dialysis", "Emergency Medicine", "General Surgery"], accreditation: ["NABH"], ayushmanEmpanelled: true, coordinates: { lat: 23.1614, lng: 77.4710 }, googlePlaceId: "ChIJh5vxYqpGfDkRE9pHFE3EG0c", rating: 4.4, ratingCount: 1261, open24x7: true, status: "green" },
-  { hospitalName: "Krishna Cancer Hospital", fullName: "Krishna Cancer Hospital", type: "Private", category: "Speciality – Cancer", area: "Bawadiya Kalan", address: "Sahyog Vihar, near Shahpura, Nav Door Sanchar Nagar, Bawadiya Kalan, Bhopal, MP 462039", emergency: false, phone: "+91-755-491-9919", totalBeds: 80, availableBeds: null, icuBeds: 10, icuAvailable: null, ventilators: 6, ventilatorsAvailable: null, specialties: ["Medical Oncology", "Surgical Oncology", "Chemotherapy", "Cancer Screening"], accreditation: [], ayushmanEmpanelled: true, coordinates: { lat: 23.1867, lng: 77.4355 }, googlePlaceId: "ChIJAQAAwKZDfDkRsgU2gLMDt_A", rating: 4.7, ratingCount: 491, open24x7: false, status: "green" },
-  { hospitalName: "Siddhanta Hospital", fullName: "Siddhanta Red Cross Superspeciality Hospital", type: "Private", category: "Super Speciality", area: "Shivaji Nagar", address: "Link Rd 1, Shivaji Nagar, Bhopal, MP 462011", emergency: true, phone: "+91-755-257-2555", totalBeds: 120, availableBeds: null, icuBeds: 20, icuAvailable: null, ventilators: 15, ventilatorsAvailable: null, specialties: ["Cardiology", "Cardiac Surgery", "Neurology", "Nephrology", "Critical Care", "Emergency Medicine"], accreditation: ["NABH"], ayushmanEmpanelled: true, coordinates: { lat: 23.2308, lng: 77.4200 }, googlePlaceId: "ChIJF-_EDlpDfDkR-yORhH9_Sw4", rating: 4.5, ratingCount: 231, open24x7: true, status: "green" },
-  { hospitalName: "ASG Eye Hospital", fullName: "ASG Eye Hospital Bhopal", type: "Private", category: "Speciality – Eye", area: "Shivaji Nagar", address: "Mahadev Commercial Complex, Near Board Office, Shivaji Nagar, Bhopal, MP 462011", emergency: false, phone: "+91-674-617-2350", totalBeds: 50, availableBeds: null, icuBeds: 0, icuAvailable: null, ventilators: 0, ventilatorsAvailable: null, specialties: ["LASIK Surgery", "Cataract Surgery", "Glaucoma", "ICL Procedure", "Cornea", "Retina", "Pediatric Ophthalmology"], accreditation: [], ayushmanEmpanelled: false, coordinates: { lat: 23.2305, lng: 77.4310 }, googlePlaceId: "ChIJl-axWzlDfDkRC9lKdXdR8dQ", rating: 4.9, ratingCount: 14452, open24x7: false, status: "green" },
-  { hospitalName: "Carewell Hospital", fullName: "Carewell Multispeciality Hospital", type: "Private", category: "Multi-Speciality", area: "Lalghati", address: "Gufa Mandir Rd, Vitthal Nagar, Nayapura, Lalghati, Bhopal, MP 462001", emergency: true, phone: "+91-70007-47155", totalBeds: 150, availableBeds: null, icuBeds: 20, icuAvailable: null, ventilators: 15, ventilatorsAvailable: null, specialties: ["Laparoscopy", "Cardiac Surgery", "Laser Surgery", "Anorectal Surgery", "General Medicine", "Emergency Care"], accreditation: [], ayushmanEmpanelled: true, coordinates: { lat: 23.2815, lng: 77.3769 }, googlePlaceId: "ChIJh7Er7TppfDkROehsjPzyT0w", rating: 4.4, ratingCount: 62, open24x7: true, status: "green" },
-  { hospitalName: "RK Hospital", fullName: "R.K. Hospital and Research Centre", type: "Private", category: "Multi-Speciality", area: "Indrapuri", address: "226-C, Raisen Rd, Sector C, Indrapuri, Bhopal, MP 462022", emergency: true, phone: "+91-755-426-0605", totalBeds: 100, availableBeds: null, icuBeds: 15, icuAvailable: null, ventilators: 10, ventilatorsAvailable: null, specialties: ["Laparoscopy", "Hernia Surgery", "General Surgery", "Orthopedics", "Gastroenterology"], accreditation: [], ayushmanEmpanelled: true, coordinates: { lat: 23.2523, lng: 77.4664 }, googlePlaceId: "ChIJT8XTZQFCfDkRM1ygBYOaPYU", rating: 3.4, ratingCount: 67, open24x7: true, status: "green" },
-  { hospitalName: "Sai Hospital", fullName: "Sai Hospital & Trauma Center", type: "Private", category: "Multi-Speciality & Trauma", area: "Raisen Road", address: "21/1, Anandnagar, Raisen Rd, Bhopal, MP 462022", emergency: true, phone: "+91-755-405-9003", totalBeds: 80, availableBeds: null, icuBeds: 10, icuAvailable: null, ventilators: 8, ventilatorsAvailable: null, specialties: ["Trauma Surgery", "Emergency Medicine", "General Surgery", "Orthopedics"], accreditation: [], ayushmanEmpanelled: false, coordinates: { lat: 23.2500, lng: 77.4881 }, googlePlaceId: "ChIJ8bgWh79DfDkRIxnduUqbjO8", rating: 3.7, ratingCount: 31, open24x7: true, status: "amber" },
-  { hospitalName: "Citi Hospital", fullName: "Citi Multispeciality Hospital", type: "Private", category: "Multi-Speciality", area: "Govindpura", address: "MIG 215-216, Gautam Nagar, Housing Board Colony, Govindpura, Bhopal, MP 462011", emergency: true, phone: "+91-755-427-2669", totalBeds: 80, availableBeds: null, icuBeds: 12, icuAvailable: null, ventilators: 8, ventilatorsAvailable: null, specialties: ["Cardiology", "General Medicine", "Surgery", "Emergency Care"], accreditation: [], ayushmanEmpanelled: false, coordinates: { lat: 23.2351, lng: 77.4411 }, googlePlaceId: "ChIJ____L2lCfDkRDdJqNmGx_Oc", rating: 3.9, ratingCount: 100, open24x7: true, status: "green" }
+  { hospitalName: "AIIMS Bhopal", fullName: "All India Institute of Medical Sciences Bhopal", type: "Government – Teaching & Research", category: "Super Speciality", area: "Saket Nagar", address: "AIIMS Campus Rd, AIIMS Campus, Saket Nagar, Habib Ganj, Bhopal, MP 462020", emergency: true, phone: "+91-755-298-2607", totalBeds: 960, availableBeds: 120, icuBeds: 100, icuAvailable: 18, ventilators: 80, ventilatorsAvailable: 12, specialties: ["General Medicine", "Surgery", "Cardiology", "Neurology", "Oncology", "Orthopedics", "Pediatrics", "Gynecology", "Radiology", "Psychiatry"], accreditation: ["NABH", "MCI"], ayushmanEmpanelled: true, coordinates: { lat: 23.2094, lng: 77.4582 }, rating: 4.0, ratingCount: 1895, open24x7: true, status: "green" },
+  { hospitalName: "Hamidia Hospital", fullName: "Hamidia Hospital (Gandhi Medical College)", type: "Government – Teaching", category: "Tertiary Care", area: "Royal Market", address: "Sultania Rd, Royal Market, Bhopal, MP 462001", emergency: true, phone: "+91-755-254-0590", totalBeds: 1500, availableBeds: 280, icuBeds: 120, icuAvailable: 32, ventilators: 100, ventilatorsAvailable: 15, specialties: ["General Medicine", "Surgery", "Orthopedics", "Gynecology", "Pediatrics", "Cardiology", "Neurology", "Emergency Medicine", "ENT", "Ophthalmology"], accreditation: ["MCI"], ayushmanEmpanelled: true, coordinates: { lat: 23.2592, lng: 77.3942 }, rating: 3.2, ratingCount: 783, open24x7: true, status: "green" },
+  { hospitalName: "Bansal Hospital", fullName: "Bansal Hospital Bhopal", type: "Private", category: "Multi-Speciality", area: "Shahpura", address: "Chuna Bhatti Rd, Manisha Market, Sector C, Shahpura, Bhopal, MP 462039", emergency: true, phone: "+91-755-408-6000", totalBeds: 400, availableBeds: 75, icuBeds: 50, icuAvailable: 12, ventilators: 30, ventilatorsAvailable: 8, specialties: ["Cardiology", "Neurology", "Orthopedics", "Urology", "Gastroenterology", "Oncology", "Laparoscopic Surgery", "Nephrology"], accreditation: ["NABH"], ayushmanEmpanelled: true, coordinates: { lat: 23.1995, lng: 77.4199 }, rating: 4.0, ratingCount: 3000, open24x7: true, status: "green" },
+  { hospitalName: "Apollo Sage Hospital", fullName: "ApolloSage Hospitals Bhopal", type: "Private", category: "Multi-Speciality", area: "Bawadiya Kalan", address: "Bawadiya Kalan, Salaiya, Bhopal, MP 462026", emergency: true, phone: "+91-93039-72510", totalBeds: 350, availableBeds: 60, icuBeds: 60, icuAvailable: 10, ventilators: 40, ventilatorsAvailable: 6, specialties: ["Cardiology", "Organ Transplant", "Neurology", "Radiology", "Oncology", "Orthopedics", "Maternity", "Laparoscopy"], accreditation: ["NABH"], ayushmanEmpanelled: false, coordinates: { lat: 23.1776, lng: 77.4424 }, rating: 4.5, ratingCount: 3500, open24x7: true, status: "green" },
+  { hospitalName: "People's Hospital", fullName: "People's Hospital Bhopal", type: "Private – Teaching", category: "Multi-Speciality", area: "Bhanpur", address: "Ayodhya Bypass Rd, Peoples Campus, Bhanpur, Bhopal, MP 462037", emergency: true, phone: "+91-755-248-0000", totalBeds: 700, availableBeds: 140, icuBeds: 80, icuAvailable: 22, ventilators: 50, ventilatorsAvailable: 10, specialties: ["Neonatology", "Pediatrics", "Cardiology", "Orthopedics", "Neurology", "Gastroenterology", "Gynecology", "Oncology"], accreditation: ["NABH"], ayushmanEmpanelled: true, coordinates: { lat: 23.3011, lng: 77.4246 }, rating: 4.5, ratingCount: 961, open24x7: true, status: "green" },
+  { hospitalName: "JP Hospital", fullName: "Jai Prakash District Hospital", type: "Government", category: "District Hospital", area: "Shivaji Nagar", address: "Shivaji Nagar, Bhopal, MP 462003", emergency: true, phone: "+91-755-266-0248", totalBeds: 300, availableBeds: 45, icuBeds: 30, icuAvailable: 5, ventilators: 20, ventilatorsAvailable: 3, specialties: ["General Medicine", "Surgery", "Obstetrics", "Gynecology", "Pediatrics", "Emergency Care"], accreditation: [], ayushmanEmpanelled: true, coordinates: { lat: 23.2301, lng: 77.4178 }, rating: 3.6, ratingCount: 424, open24x7: true, status: "amber" },
+  { hospitalName: "Noble Hospital", fullName: "Noble Multispeciality Hospital", type: "Private", category: "Multi-Speciality", area: "Misrod", address: "269/1, Near Capital Mall, Misrod, Bhopal, MP 462026", emergency: true, phone: "+91-755-248-8008", totalBeds: 110, availableBeds: 30, icuBeds: 20, icuAvailable: 6, ventilators: 12, ventilatorsAvailable: 4, specialties: ["Cardiology", "Orthopedics", "Neurology", "Dialysis", "Emergency Medicine", "General Surgery"], accreditation: ["NABH"], ayushmanEmpanelled: true, coordinates: { lat: 23.1614, lng: 77.4710 }, rating: 4.4, ratingCount: 1261, open24x7: true, status: "green" },
+  { hospitalName: "Siddhanta Hospital", fullName: "Siddhanta Red Cross Superspeciality Hospital", type: "Private", category: "Super Speciality", area: "Shivaji Nagar", address: "Link Rd 1, Shivaji Nagar, Bhopal, MP 462011", emergency: true, phone: "+91-755-257-2555", totalBeds: 120, availableBeds: 25, icuBeds: 20, icuAvailable: 4, ventilators: 15, ventilatorsAvailable: 3, specialties: ["Cardiology", "Cardiac Surgery", "Neurology", "Nephrology", "Critical Care", "Emergency Medicine"], accreditation: ["NABH"], ayushmanEmpanelled: true, coordinates: { lat: 23.2308, lng: 77.4200 }, rating: 4.5, ratingCount: 231, open24x7: true, status: "green" },
+  { hospitalName: "Chirayu Hospital", fullName: "Chirayu Medical College & Hospital", type: "Private – Teaching", category: "Multi-Speciality", area: "Bairagarh", address: "Bhopal Byp, Bhainsakhedi, Bairagarh, Bhopal, MP 462030", emergency: true, phone: "+91-755-270-9101", totalBeds: 750, availableBeds: 180, icuBeds: 80, icuAvailable: 20, ventilators: 50, ventilatorsAvailable: 12, specialties: ["General Medicine", "Surgery", "Cardiology", "Pediatrics", "Gynecology", "Orthopedics", "Radiology", "Neurology"], accreditation: ["NABH", "MCI"], ayushmanEmpanelled: true, coordinates: { lat: 23.2690, lng: 77.3081 }, rating: 3.3, ratingCount: 660, open24x7: true, status: "green" },
+  { hospitalName: "Narmada Trauma Centre", fullName: "Narmada Trauma Centre Pvt Ltd", type: "Private", category: "Multi-Speciality & Trauma", area: "Arera Colony", address: "E3/23, Arera Colony, Bhopal, MP 462016", emergency: true, phone: "+91-755-404-0000", totalBeds: 200, availableBeds: 40, icuBeds: 30, icuAvailable: 8, ventilators: 20, ventilatorsAvailable: 5, specialties: ["Trauma Surgery", "Orthopedics", "Neurosurgery", "Emergency Medicine", "General Surgery", "Critical Care"], accreditation: [], ayushmanEmpanelled: true, coordinates: { lat: 23.2177, lng: 77.4392 }, rating: 4.1, ratingCount: 515, open24x7: true, status: "green" }
 ];
 
-async function seedDB() {
+const doctors = [
+  // AIIMS Bhopal doctors
+  { name: "Dr. Rajesh Kumar Sharma", specialty: "Cardiology", qualification: "MD, DM Cardiology", experience: 18, consultationFee: 800 },
+  { name: "Dr. Priya Srivastava", specialty: "Neurology", qualification: "MD, DM Neurology", experience: 14, consultationFee: 900 },
+  { name: "Dr. Suresh Mehta", specialty: "Orthopedics", qualification: "MS Orthopedics", experience: 20, consultationFee: 700 },
+  // Hamidia Hospital
+  { name: "Dr. Anita Joshi", specialty: "Gynecology", qualification: "MS Gynecology", experience: 12, consultationFee: 500 },
+  { name: "Dr. Vikram Singh", specialty: "General Surgery", qualification: "MS Surgery", experience: 15, consultationFee: 400 },
+  // Bansal Hospital
+  { name: "Dr. Neha Agarwal", specialty: "Cardiology", qualification: "MD, DM Cardiology", experience: 10, consultationFee: 1200 },
+  { name: "Dr. Ramesh Dubey", specialty: "Urology", qualification: "MS Urology", experience: 16, consultationFee: 1000 },
+  // Apollo Sage
+  { name: "Dr. Kavita Verma", specialty: "Oncology", qualification: "MD, DM Oncology", experience: 13, consultationFee: 1500 },
+  { name: "Dr. Ajay Patel", specialty: "Neurology", qualification: "MD, DM Neurology", experience: 11, consultationFee: 1100 },
+  // People's Hospital
+  { name: "Dr. Sunita Tiwari", specialty: "Pediatrics", qualification: "MD Pediatrics", experience: 9, consultationFee: 600 },
+  { name: "Dr. Manoj Khare", specialty: "Gastroenterology", qualification: "MD, DM Gastro", experience: 17, consultationFee: 900 },
+];
+
+async function seedAll() {
   try {
     await mongoose.connect(process.env.MONGODB_URI);
     console.log('✅ MongoDB Connected');
 
-    // Clear existing data
+    // Clear all
     await Hospital.deleteMany({});
-    console.log('🗑️  Old data cleared');
+    await HospitalAdmin.deleteMany({});
+    await Doctor.deleteMany({});
+    await User.deleteMany({});
+    console.log('🗑️  Cleared existing data (Hospitals, Admins, Doctors, Users)');
 
-    // Insert all hospitals
-    const inserted = await Hospital.insertMany(hospitals);
-    console.log(`🏥 ${inserted.length} hospitals inserted successfully!`);
+    // Insert hospitals
+    const insertedHospitals = await Hospital.insertMany(hospitals);
+    console.log(`🏥 ${insertedHospitals.length} hospitals inserted`);
 
-    // Show summary
-    const count = await Hospital.countDocuments();
-    console.log(`📊 Total hospitals in DB: ${count}`);
+    // Insert doctors distributed across hospitals
+    const hospitalIds = insertedHospitals.map(h => h._id);
+    const doctorData = doctors.map((d, i) => ({
+      ...d,
+      hospital: hospitalIds[i % hospitalIds.length],
+      hospitalName: insertedHospitals[i % hospitalIds.length].hospitalName,
+      availableStatus: ['available', 'available', 'busy', 'available', 'off-duty'][Math.floor(Math.random() * 5)] || 'available',
+      phone: `+91-98${Math.floor(10000000 + Math.random() * 89999999)}`
+    }));
+    const insertedDoctors = await Doctor.insertMany(doctorData);
+    console.log(`👨‍⚕️ ${insertedDoctors.length} doctors inserted`);
+
+    // Create ONE HospitalAdmin per hospital
+    const DEFAULT_PASSWORD = 'hospital@123';
+    const adminDocs = insertedHospitals.map((h, i) => ({
+      name: `${h.hospitalName} Admin`,
+      email: `admin${i + 1}@medflow.com`,
+      password: DEFAULT_PASSWORD,
+      hospital: h._id,
+      hospitalName: h.hospitalName
+    }));
+    // Use individual save so bcrypt pre-save hook runs on each
+    const createdAdmins = [];
+    for (const a of adminDocs) {
+      const adm = new HospitalAdmin(a);
+      await adm.save();
+      createdAdmins.push(adm);
+    }
+    console.log(`🔑 ${createdAdmins.length} hospital admin accounts created`);
+
+    // Create a static Test Patient for mobile app testing
+    const testUser = new User({
+      name: 'Test Patient',
+      phone: '9988776655',
+      password: 'user123',
+      bloodGroup: 'O+',
+      address: 'Arera Colony, Bhopal'
+    });
+    await testUser.save();
+    console.log('👤 Static Test Patient created: 9988776655 / user123');
+
+    console.log('\n========================================');
+    console.log('✅ DATABASE SEEDED SUCCESSFULLY!');
+    console.log('========================================');
+    console.log('🌐 Hospital Web Panel Login:');
+    console.log('   → Select hospital from dropdown');
+    console.log(`   → Password for ALL hospitals: ${DEFAULT_PASSWORD}`);
+    console.log('   (Each hospital admin sees only their own data)');
+    console.log('\n📋 Hospital Admins Created:');
+    insertedHospitals.forEach((h, i) => {
+      console.log(`   [${i + 1}] ${h.hospitalName}`);
+    });
+    console.log('========================================\n');
 
     process.exit(0);
   } catch (err) {
@@ -54,4 +114,4 @@ async function seedDB() {
   }
 }
 
-seedDB();
+seedAll();

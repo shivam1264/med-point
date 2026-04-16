@@ -80,9 +80,17 @@ const hospitalSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  coordinates: {
-    lat: { type: Number },
-    lng: { type: Number }
+  location: {
+    type: {
+      type: String,
+      enum: ['Point'],
+      default: 'Point'
+    },
+    coordinates: {
+      type: [Number], // [lng, lat]
+      required: true,
+      default: [77.4126, 23.2599] // Default to Bhopal
+    }
   },
   googlePlaceId: {
     type: String,
@@ -113,8 +121,19 @@ const hospitalSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Index for text search
+// Virtual for backward compatibility
+hospitalSchema.virtual('coordinates').get(function() {
+  if (this.location && this.location.coordinates) {
+    return {
+      lng: this.location.coordinates[0],
+      lat: this.location.coordinates[1]
+    };
+  }
+  return null;
+});
+
+// Indexes
+hospitalSchema.index({ location: '2dsphere' });
 hospitalSchema.index({ hospitalName: 'text', fullName: 'text', area: 'text', specialties: 'text' });
-hospitalSchema.index({ 'coordinates.lat': 1, 'coordinates.lng': 1 });
 
 module.exports = mongoose.model('Hospital', hospitalSchema);
