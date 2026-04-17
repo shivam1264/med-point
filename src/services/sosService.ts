@@ -18,6 +18,10 @@ export const sosService = {
     return res.data.data;
   },
 
+  async cancelSOS(id: string): Promise<void> {
+    await apiClient.patch(`/emergencies/${id}/cancel`);
+  },
+
   async getActiveEmergency(): Promise<Emergency | null> {
     const res = await apiClient.get('/emergencies/active');
     return res.data.data;

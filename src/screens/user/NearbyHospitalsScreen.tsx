@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  View, Text, StyleSheet, FlatList, TouchableOpacity, SectionList, ScrollView, Modal,
   ActivityIndicator, Alert, RefreshControl, StatusBar, PermissionsAndroid, Platform, Linking
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Geolocation from '@react-native-community/geolocation';
 import hospitalService from '../../services/hospitalService';
+import sosService from '../../services/sosService';
 import type { Hospital } from '../../types';
 
 const statusConfig = {
@@ -17,12 +18,13 @@ const statusConfig = {
 };
 
 export function NearbyHospitalsScreen({ navigation }: any) {
-  const [hospitals, setHospitals] = useState<Hospital[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [userLat, setUserLat] = useState<number | null>(null);
   const [userLng, setUserLng] = useState<number | null>(null);
   const [locationError, setLocationError] = useState(false);
+  const [hospitals, setHospitals] = useState<Hospital[]>([]);
+  const [showSOSOverlay, setShowSOSOverlay] = useState(false);
 
   const [isSOSMode, setIsSOSMode] = useState(false);
 
@@ -35,6 +37,7 @@ export function NearbyHospitalsScreen({ navigation }: any) {
       
       if (params?.isEmergency) {
         setIsSOSMode(true);
+        setShowSOSOverlay(true); // Show floating window
         // Clear param so next visit is normal
         navigation.setParams({ isEmergency: undefined });
         fetchLocation(true);
@@ -110,7 +113,10 @@ export function NearbyHospitalsScreen({ navigation }: any) {
 
   const fetchHospitals = async (lat: number, lng: number, useSOS: boolean) => {
     try {
-      const data = await hospitalService.getNearbyHospitals(lat, lng, useSOS ? 5 : 20, useSOS);
+      // Fetch hospitals
+      const data = await hospitalService.getNearbyHospitals(lat, lng, 50, useSOS);
+      console.log(`🏥 Total Hospitals Found: ${data.length} (Requested 50)`);
+      
       setHospitals(data);
     } catch (err: any) {
       Alert.alert('Error', 'Failed to load hospitals. Make sure backend is running.');
@@ -127,13 +133,14 @@ export function NearbyHospitalsScreen({ navigation }: any) {
       const result = await sosService.triggerSOS(userLat, userLng, hospital._id);
       
       Alert.alert(
-        '🚑 Booking Confirmed!',
-        `Ambulance from ${hospital.hospitalName} is being dispatched.\n\nDriver: ${result.data.ambulanceDriverName || 'Assigning...'}`,
-        [{ text: 'Great', onPress: () => navigation.navigate('Home') }]
+        '🚑 Request Sent!',
+        `Your request has been sent to ${hospital.hospitalName}. We are notifying nearby drivers.\n\nYou will be able to track once a driver accepts.`,
+        [{ text: 'OK' }]
       );
     } catch (err: any) {
-      const msg = err?.response?.data?.message || 'Ambulance booking failed. Try another hospital.';
-      Alert.alert('Booking Failed', msg);
+      console.log('SOS Failure', err?.response?.data || err);
+      const msg = err?.response?.data?.message || err.message || 'Ambulance booking failed. Try another hospital.';
+      Alert.alert('Booking Failed', `Error: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -151,14 +158,11 @@ export function NearbyHospitalsScreen({ navigation }: any) {
   const renderHospital = ({ item, index }: { item: Hospital; index: number }) => {
     const cfg = statusConfig[item.status] || statusConfig.green;
     const dist = item.distanceKm?.toFixed(1);
-    const eta = item.distanceKm ? Math.round(item.distanceKm * 3) : null; // ~3 min/km
+    const eta = item.distanceKm ? Math.round(item.distanceKm * 3) : null;
 
     return (
       <View style={styles.card}>
         <View style={styles.cardHeader}>
-          <View style={styles.rankBadge}>
-            <Text style={styles.rankText}>#{index + 1}</Text>
-          </View>
           <View style={styles.cardInfo}>
             <Text style={styles.hospitalName} numberOfLines={1}>{item.hospitalName}</Text>
             <Text style={styles.hospitalArea} numberOfLines={1}>{item.area || item.address}</Text>
@@ -182,48 +186,7 @@ export function NearbyHospitalsScreen({ navigation }: any) {
               <Text style={styles.metaText}>~{eta} min</Text>
             </View>
           )}
-          {item.emergency && (
-            <View style={styles.metaItem}>
-              <Icon name="alert-circle" size={14} color="#C0392B" />
-              <Text style={[styles.metaText, { color: '#C0392B' }]}>24/7 Emergency</Text>
-            </View>
-          )}
         </View>
-
-        {/* Beds */}
-        <View style={styles.bedsRow}>
-          <View style={styles.bedItem}>
-            <Text style={styles.bedNum}>{item.icuAvailable ?? '?'}</Text>
-            <Text style={styles.bedLabel}>ICU Free</Text>
-            <Text style={styles.bedTotal}>/ {item.icuBeds}</Text>
-          </View>
-          <View style={styles.bedDivider} />
-          <View style={styles.bedItem}>
-            <Text style={styles.bedNum}>{item.availableBeds ?? '?'}</Text>
-            <Text style={styles.bedLabel}>General Free</Text>
-            <Text style={styles.bedTotal}>/ {item.totalBeds}</Text>
-          </View>
-          <View style={styles.bedDivider} />
-          <View style={styles.bedItem}>
-            <Text style={styles.bedNum}>{item.ventilatorsAvailable ?? '?'}</Text>
-            <Text style={styles.bedLabel}>Ventilators</Text>
-            <Text style={styles.bedTotal}>/ {item.ventilators}</Text>
-          </View>
-        </View>
-
-        {/* Specialties */}
-        {item.specialties && item.specialties.length > 0 && (
-          <View style={styles.specRow}>
-            {item.specialties.slice(0, 3).map((s, i) => (
-              <View key={i} style={styles.specChip}>
-                <Text style={styles.specText}>{s}</Text>
-              </View>
-            ))}
-            {item.specialties.length > 3 && (
-              <Text style={styles.specMore}>+{item.specialties.length - 3} more</Text>
-            )}
-          </View>
-        )}
 
         {/* Actions */}
         <View style={styles.actions}>
@@ -278,19 +241,14 @@ export function NearbyHospitalsScreen({ navigation }: any) {
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="light-content" backgroundColor="#0D0D0D" />
-      <View style={[styles.headerBar, isSOSMode && styles.emergencyHeader]}>
-        <Text style={styles.title}>{isSOSMode ? '🆘 Suggested Hospitals' : 'Nearest Hospitals'}</Text>
-        <Text style={styles.subtitle}>
-          {isSOSMode 
-            ? 'Top 5 hospitals with available beds nearest to you' 
-            : 'Top 20 hospitals sorted by distance • Live bed count'
-          }
-        </Text>
+      <View style={styles.headerBar}>
+        <Text style={styles.title}>All Hospitals Nearby</Text>
+        <Text style={styles.subtitle}>Showing all hospitals sorted by distance</Text>
       </View>
       <FlatList
         data={hospitals}
         keyExtractor={(item) => item._id}
-        renderItem={renderHospital}
+        renderItem={({ item, index }) => renderHospital({ item, index })}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#C0392B" />}
@@ -301,25 +259,104 @@ export function NearbyHospitalsScreen({ navigation }: any) {
           </View>
         }
       />
+
+      {/* Floating SOS Overlay */}
+      <Modal
+        visible={showSOSOverlay}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowSOSOverlay(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setShowSOSOverlay(false)}
+        >
+          <View style={styles.floatingWindow}>
+            <View style={styles.floatingHeader}>
+              <View style={styles.floatingTitleWrapper}>
+                <Icon name="star" size={20} color="#F39C12" />
+                <Text style={styles.floatingTitle}>AI Top Recommended</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowSOSOverlay(false)} style={styles.closeBtn}>
+                <Icon name="close" size={24} color="#888" />
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.floatingSub}>Fastest response & high bed availability</Text>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.floatingList}>
+              {hospitals.slice(0, 5).map((h, i) => (
+                <TouchableOpacity 
+                  key={h._id} 
+                  style={styles.floatingCard}
+                  onPress={() => {
+                    setShowSOSOverlay(false);
+                    handleBookAmbulance(h);
+                  }}
+                >
+                  <View style={styles.floatingCardHeader}>
+                    <Text style={styles.floatingCardName} numberOfLines={1}>{h.hospitalName}</Text>
+                    <View style={styles.statusDotLine}>
+                      <View style={[styles.statusDot, { backgroundColor: statusConfig[h.status]?.color || '#27AE60' }]} />
+                    </View>
+                  </View>
+                  <Text style={styles.floatingCardDist}>{h.distanceKm?.toFixed(1)} km · {Math.round(h.distanceKm! * 3)} min</Text>
+                  <View style={styles.floatingCardBeds}>
+                    <Icon name="bed-outline" size={14} color="#aaa" />
+                    <Text style={styles.floatingBedText}>{h.availableBeds} Free</Text>
+                  </View>
+                  <View style={styles.sosGoBtn}>
+                    <Text style={styles.sosGoText}>BOOK NOW</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            
+            <TouchableOpacity style={styles.seeFullBtn} onPress={() => setShowSOSOverlay(false)}>
+              <Text style={styles.seeFullText}>View All Hospitals</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#0D0D0D' },
-  headerBar: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
-  title: { fontSize: 22, fontWeight: '800', color: '#fff' },
-  subtitle: { fontSize: 12, color: '#888', marginTop: 4 },
-  list: { paddingHorizontal: 16, paddingBottom: 32, paddingTop: 8 },
-  card: {
-    backgroundColor: '#1A1A1A', borderRadius: 16,
-    padding: 16, marginBottom: 14, borderWidth: 1, borderColor: '#2A2A2A'
+  headerBar: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 },
+  title: { fontSize: 24, fontWeight: '800', color: '#fff' },
+  subtitle: { fontSize: 13, color: '#888', marginTop: 4 },
+  list: { paddingBottom: 32 },
+  sectionHeader: { 
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 16, paddingTop: 28, paddingBottom: 14, backgroundColor: '#0D0D0D' 
   },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  recommendedHeader: { borderBottomWidth: 0 },
+  othersHeader: { borderTopWidth: 1, borderTopColor: '#222', marginTop: 10 },
+  sectionTitle: { fontSize: 13, fontWeight: '800', color: '#888', letterSpacing: 1.5, textTransform: 'uppercase' },
+  aiBadge: { 
+    position: 'absolute', top: -10, right: 16, zIndex: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: '#C0392B', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,
+    shadowColor: '#C0392B', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 6, elevation: 8
+  },
+  aiBadgeText: { fontSize: 9, fontWeight: '900', color: '#fff', letterSpacing: 0.5 },
+  card: {
+    backgroundColor: '#1A1A1A', borderRadius: 16, marginHorizontal: 16,
+    padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#2A2A2A'
+  },
+  recommendedCard: {
+    borderColor: '#C0392B66', borderWidth: 1.5, backgroundColor: '#1E1414',
+    shadowColor: '#C0392B', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 10, elevation: 4
+  },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   rankBadge: {
     width: 32, height: 32, borderRadius: 10,
-    backgroundColor: '#C0392B20', alignItems: 'center', justifyContent: 'center', marginRight: 10
+    backgroundColor: '#333', alignItems: 'center', justifyContent: 'center', marginRight: 10
   },
+  recommendedRankBadge: { backgroundColor: '#C0392B20' },
   rankText: { fontSize: 13, fontWeight: '700', color: '#C0392B' },
   cardInfo: { flex: 1 },
   hospitalName: { fontSize: 15, fontWeight: '700', color: '#fff' },
@@ -383,4 +420,36 @@ const styles = StyleSheet.create({
   retryBtn: { backgroundColor: '#C0392B', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10, marginTop: 8 },
   retryText: { color: '#fff', fontWeight: '700' },
   emptyText: { color: '#888', fontSize: 14 },
+
+  // Floating Window Styles
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
+  floatingWindow: {
+    backgroundColor: '#111',
+    borderTopLeftRadius: 32, borderTopRightRadius: 32,
+    padding: 20, paddingTop: 10,
+    borderWidth: 1, borderColor: '#C0392B44',
+  },
+  floatingHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  floatingTitleWrapper: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  floatingTitle: { fontSize: 20, fontWeight: '800', color: '#fff' },
+  floatingSub: { fontSize: 13, color: '#888', marginBottom: 20, marginLeft: 28 },
+  closeBtn: { padding: 8 },
+  floatingList: { paddingBottom: 10, gap: 15 },
+  floatingCard: {
+    width: 200, backgroundColor: '#1E1414', borderRadius: 20,
+    padding: 16, borderWidth: 1, borderColor: '#C0392B33',
+    elevation: 4
+  },
+  floatingCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 },
+  floatingCardName: { fontSize: 15, fontWeight: '700', color: '#fff', flex: 1 },
+  floatingCardDist: { fontSize: 12, color: '#aaa', marginBottom: 12 },
+  floatingCardBeds: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 },
+  floatingBedText: { fontSize: 12, color: '#888' },
+  sosGoBtn: { backgroundColor: '#C0392B', paddingVertical: 8, borderRadius: 10, alignItems: 'center' },
+  sosGoText: { fontSize: 11, fontWeight: '800', color: '#fff', letterSpacing: 0.5 },
+  seeFullBtn: { marginTop: 15, paddingVertical: 12, alignItems: 'center' },
+  seeFullText: { color: '#666', fontSize: 13, fontWeight: '600', textDecorationLine: 'underline' },
+  statusDotLine: { marginLeft: 8 },
+  emptyOthers: { paddingVertical: 20, alignItems: 'center' },
+  emptyOthersText: { color: '#444', fontSize: 12, fontStyle: 'italic' },
 });

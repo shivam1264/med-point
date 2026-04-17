@@ -8,6 +8,8 @@ import { NearbyHospitalsScreen } from '../screens/user/NearbyHospitalsScreen';
 import { DoctorScreen } from '../screens/user/DoctorScreen';
 import { UserMapScreen } from '../screens/user/UserMapScreen';
 
+import { UserEmergencyTrackScreen } from '../screens/user/UserEmergencyTrackScreen';
+
 export type UserTabParamList = {
   Home: undefined;
   Hospitals: undefined;
@@ -17,6 +19,7 @@ export type UserTabParamList = {
 export type UserStackParamList = {
   UserTabs: undefined;
   UserMap: { hospital: any; userLat?: number; userLng?: number };
+  UserEmergencyTrack: { emergencyId: string };
 };
 
 const Tab = createBottomTabNavigator<UserTabParamList>();
@@ -30,27 +33,6 @@ const tabBarStyle = {
 };
 
 function UserTabNavigator() {
-  React.useEffect(() => {
-    if (Platform.OS === 'android') {
-      requestGlobalLocationPermission();
-    }
-  }, []);
-
-  const requestGlobalLocationPermission = async () => {
-    try {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        {
-          title: 'Location Permission',
-          message: 'MedFlow needs location access to find nearby hospitals and dispatch ambulances.',
-          buttonPositive: 'OK',
-        },
-      );
-    } catch (err) {
-      console.warn(err);
-    }
-  };
-
   return (
     <Tab.Navigator
       screenOptions={{
@@ -93,6 +75,7 @@ export function UserTabs() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="UserTabs" component={UserTabNavigator} />
       <Stack.Screen name="UserMap" component={UserMapScreen} />
+      <Stack.Screen name="UserEmergencyTrack" component={UserEmergencyTrackScreen} />
     </Stack.Navigator>
   );
 }

@@ -17,24 +17,40 @@ export default function BedManagement() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState('');
 
-  useEffect(() => { if (admin?.hospitalId) loadHospital(); }, [admin]);
+  useEffect(() => { 
+    if (admin) {
+      const hid = admin.hospitalId || (admin as any).hospital;
+      loadHospital(hid);
+    }
+  }, [admin]);
 
-  const loadHospital = async () => {
+  const loadHospital = async (hid?: string) => {
     try {
-      const res = await api.get(`/hospitals/${admin!.hospitalId}`);
-      const h = res.data.data || res.data;
-      setHospital(h);
-      setLocalData({
-        icu: h.icuAvailable ?? 0,
-        general: h.availableBeds ?? 0,
-        vent: h.ventilatorsAvailable ?? 0,
-        status: h.status || 'green'
-      });
+      if (hid) {
+        const res = await api.get(`/hospitals/${hid}`);
+        const h = res.data.data || res.data;
+        if (h && h._id) {
+          setHospital(h);
+          setLocalData({
+            icu: h.icuAvailable ?? 0,
+            general: h.availableBeds ?? 0,
+            vent: h.ventilatorsAvailable ?? 0,
+            status: h.status || 'green'
+          });
+          setLoading(false);
+          return;
+        }
+      }
+      throw new Error("Not found by ID");
     } catch (e) {
-      // fallback: search in list
+      // fallback: search in list by ID or by Name
       try {
-        const res = await api.get(`/hospitals?limit=50`);
-        const found = (res.data.data || []).find((h: Hospital) => h._id === admin!.hospitalId);
+        const res = await api.get(`/hospitals?limit=100`);
+        const list = res.data.data || [];
+        const found = list.find((h: Hospital) => 
+          (hid && h._id === hid) || 
+          (admin?.hospitalName && h.hospitalName === admin.hospitalName)
+        );
         if (found) {
           setHospital(found);
           setLocalData({ icu: found.icuAvailable ?? 0, general: found.availableBeds ?? 0, vent: found.ventilatorsAvailable ?? 0, status: found.status || 'green' });

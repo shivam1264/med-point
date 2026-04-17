@@ -49,8 +49,15 @@ async function seedAll() {
     await User.deleteMany({});
     console.log('🗑️  Cleared existing data (Hospitals, Admins, Doctors, Users)');
 
-    // Insert hospitals
-    const insertedHospitals = await Hospital.insertMany(hospitals);
+    // Insert hospitals with correct GeoJSON mapping
+    const mappedHospitals = hospitals.map(h => ({
+      ...h,
+      location: {
+        type: 'Point',
+        coordinates: [h.coordinates.lng, h.coordinates.lat]
+      }
+    }));
+    const insertedHospitals = await Hospital.insertMany(mappedHospitals);
     console.log(`🏥 ${insertedHospitals.length} hospitals inserted`);
 
     // Insert doctors distributed across hospitals
@@ -84,6 +91,7 @@ async function seedAll() {
     console.log(`🔑 ${createdAdmins.length} hospital admin accounts created`);
 
     // Create a static Test Patient for mobile app testing
+    // Create a static Test Patient for mobile app testing
     const testUser = new User({
       name: 'Test Patient',
       phone: '9988776655',
@@ -93,6 +101,24 @@ async function seedAll() {
     });
     await testUser.save();
     console.log('👤 Static Test Patient created: 9988776655 / user123');
+
+    // Create a static Test Ambulance Driver
+    const Ambulance = require('./models/Ambulance');
+    await Ambulance.deleteMany({}); // Clear existing
+    const testAmbulance = new Ambulance({
+      driverName: 'Ramesh Driver',
+      driverPhone: '9876543210',
+      vehicleNumber: 'MP-04-AB-1234',
+      vehicleType: 'ICU',
+      driverId: 'AMB-101',
+      password: 'amb123',
+      hospital: insertedHospitals[0]._id, // AIIMS Bhopal
+      hospitalName: insertedHospitals[0].hospitalName,
+      isOnline: true,
+      isAvailable: true
+    });
+    await testAmbulance.save();
+    console.log('🚑 Static Test Ambulance Driver created: AMB-101 / amb123 (Linked to AIIMS Bhopal)');
 
     console.log('\n========================================');
     console.log('✅ DATABASE SEEDED SUCCESSFULLY!');

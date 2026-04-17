@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Geolocation from '@react-native-community/geolocation';
+import { io, Socket } from 'socket.io-client';
 import { useAuth } from '../../context/AuthContext';
 import sosService from '../../services/sosService';
 import type { Emergency } from '../../types';
@@ -18,6 +19,42 @@ export function AmbulanceHomeScreen({ navigation }: any) {
   const [pendingPopup, setPendingPopup] = useState<Emergency | null>(null);
   const [countdown, setCountdown] = useState(30);
   const [loading, setLoading] = useState(false);
+  const socketRef = React.useRef<Socket | null>(null);
+
+  // Socket setup for real-time SOS alerts
+  useEffect(() => {
+    if (!driver?.id) return;
+
+    // Connect to backend socket
+    const socket = io('http://localhost:5000', {
+      transports: ['websocket']
+    });
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      console.log('Ambulance Socket connected');
+      // Join targeted room for this ambulance
+      socket.emit('join_ambulance', driver.id);
+    });
+
+    socket.on('new_emergency', (data: any) => {
+      console.log('New real-time SOS received:', data);
+      setPendingPopup(data);
+      setCountdown(30);
+    });
+
+    socket.on('emergency_cancelled', (data: any) => {
+      console.log('SOS Cancelled by user!', data);
+      setActiveEmergency(null);
+      setPendingPopup(null);
+      setIsAvailable(true);
+      Alert.alert('Cancelled', 'The patient has cancelled the emergency request.');
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [driver?.id]);
 
   // Poll for active emergency
   useEffect(() => {
@@ -90,12 +127,21 @@ export function AmbulanceHomeScreen({ navigation }: any) {
     if (!pendingPopup) return;
     setLoading(true);
     try {
-      const emergency = await sosService.acceptEmergency(pendingPopup._id);
+      // Handle both _id (backend standard) and id/emergencyId (common in payloads)
+      const targetId = pendingPopup._id || pendingPopup.id || pendingPopup.emergencyId;
+      if (!targetId) {
+        console.error('Cant accept emergency: No ID found in popup data', pendingPopup);
+        Alert.alert('Error', 'Invalid emergency data. Please try again.');
+        setPendingPopup(null);
+        return;
+      }
+      const emergency = await sosService.acceptEmergency(targetId);
       setActiveEmergency(emergency);
       setPendingPopup(null);
       setIsAvailable(false);
     } catch (err: any) {
-      Alert.alert('Error', err?.response?.data?.message || 'Failed to accept');
+      Alert.alert('Unavailable', err?.response?.data?.message || 'Someone else already accepted this emergency or it was cancelled.');
+      setPendingPopup(null);
     } finally { setLoading(false); }
   };
 
@@ -149,7 +195,7 @@ export function AmbulanceHomeScreen({ navigation }: any) {
                 <View style={styles.modalInfo}>
                   <View style={styles.modalRow}>
                     <Icon name="map-marker" size={18} color="#888" />
-                    <Text style={styles.modalVal}>{pendingPopup.location?.address || `${pendingPopup.location?.lat?.toFixed(4)}, ${pendingPopup.location?.lng?.toFixed(4)}`}</Text>
+                    <Text style={styles.modalVal}>{pendingPopup.location?.address || `${pendingPopup.location?.coordinates?.[1]?.toFixed(4)}, ${pendingPopup.location?.coordinates?.[0]?.toFixed(4)}`}</Text>
                   </View>
                   {pendingPopup.hospitalName && (
                     <View style={styles.modalRow}>

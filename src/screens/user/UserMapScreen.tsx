@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { Hospital } from '../../types';
+import mapService, { RoutePoint } from '../../services/mapService';
 
 interface Props {
   route: { params: { hospital: Hospital; userLat?: number; userLng?: number } };
@@ -12,6 +13,7 @@ interface Props {
 
 export function UserMapScreen({ route, navigation }: Props) {
   const { hospital, userLat, userLng } = route.params;
+  const [routePoints, setRoutePoints] = React.useState<RoutePoint[]>([]);
   const mapRef = useRef<MapView>(null);
 
   const hospLat = hospital.location?.coordinates?.[1] || hospital.coordinates?.lat || 23.2599;
@@ -30,6 +32,14 @@ export function UserMapScreen({ route, navigation }: Props) {
           { edgePadding: { top: 80, right: 40, bottom: 160, left: 40 }, animated: true }
         );
       }, 500);
+
+      // Fetch road-following route
+      mapService.getRoute(
+        { lat: userLat!, lng: userLng! },
+        { lat: hospLat, lng: hospLng }
+      ).then(res => {
+        setRoutePoints(res.points);
+      });
     }
   }, []);
 
@@ -70,15 +80,28 @@ export function UserMapScreen({ route, navigation }: Props) {
 
         {/* Route line if we have user location */}
         {hasUserLocation && (
-          <Polyline
-            coordinates={[
-              { latitude: userLat!, longitude: userLng! },
-              { latitude: hospLat, longitude: hospLng }
-            ]}
-            strokeColor="#C0392B"
-            strokeWidth={3}
-            lineDashPattern={[8, 4]}
-          />
+          <>
+            {/* Background "Glow" Polyline */}
+            <Polyline
+              coordinates={routePoints.length > 0 ? routePoints : [
+                { latitude: userLat!, longitude: userLng! },
+                { latitude: hospLat, longitude: hospLng }
+              ]}
+              strokeColor="#C0392B40"
+              strokeWidth={8}
+            />
+            {/* Foreground Main Polyline */}
+            <Polyline
+              coordinates={routePoints.length > 0 ? routePoints : [
+                { latitude: userLat!, longitude: userLng! },
+                { latitude: hospLat, longitude: hospLng }
+              ]}
+              strokeColor="#C0392B"
+              strokeWidth={4}
+              lineJoin="round"
+              lineCap="round"
+            />
+          </>
         )}
       </MapView>
 

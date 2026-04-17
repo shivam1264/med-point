@@ -64,7 +64,7 @@ const deleteHospital = async (req, res) => {
 
 const getNearbyHospitals = async (req, res) => {
   try {
-    const { lat, lng, maxDistance, onlyWithBeds } = req.query;
+    const { lat, lng, maxDistance, onlyWithBeds, limit } = req.query;
     if (!lat || !lng) return res.status(400).json({ success: false, message: 'lat and lng required' });
 
     // 1. Diagnostics: Log what's in the DB
@@ -115,8 +115,7 @@ const getNearbyHospitals = async (req, res) => {
       }
     }
 
-    // 3. Perform the search with a very large radius to see IF anything exists
-    const radius = maxDistance ? parseInt(String(maxDistance)) : 500000; // 500km default
+    const radius = maxDistance ? parseInt(String(maxDistance)) : 500000; // 500km default for better discovery
 
     const pipeline = [
       {
@@ -126,17 +125,52 @@ const getNearbyHospitals = async (req, res) => {
           distanceMultiplier: 0.001,
           spherical: true,
           maxDistance: radius,
-          query: onlyWithBeds === 'true' ? {
-            $or: [{ icuAvailable: { $gt: 0 } }, { availableBeds: { $gt: 0 } }]
-          } : {}
         }
       },
-      { $sort: { distanceKm: 1 } },
-      { $limit: onlyWithBeds === 'true' ? 5 : 20 }
+      // Recommendation Scoring Logic
+      {
+        $addFields: {
+          // Normalize various factors into a 0-100 scale
+          // 1. Distance Score (0-40 pts): Closer is higher. 40 - (distance * 2) capped at 0.
+          distScore: { 
+            $max: [0, { $subtract: [40, { $multiply: ["$distanceKm", 2] }] }] 
+          },
+          // 2. Bed Score (0-35 pts): Ratio of available beds
+          bedScore: {
+            $cond: [
+              { $gt: ["$totalBeds", 0] },
+              { $multiply: [{ $divide: ["$availableBeds", "$totalBeds"] }, 35] },
+              0
+            ]
+          },
+          // 3. Rating Score (0-15 pts)
+          ratingScore: { $multiply: [{ $divide: ["$rating", 5] }, 15] },
+          // 4. Status Score (0-10 pts)
+          statusScore: {
+            $switch: {
+              branches: [
+                { case: { $eq: ["$status", "green"] }, then: 10 },
+                { case: { $eq: ["$status", "amber"] }, then: 5 },
+                { case: { $eq: ["$status", "red"] }, then: 0 }
+              ],
+              default: 5
+            }
+          }
+        }
+      },
+      {
+        $addFields: {
+          recommendationScore: { 
+            $add: ["$distScore", "$bedScore", "$ratingScore", "$statusScore"] 
+          }
+        }
+      },
+      { $sort: { recommendationScore: -1 } },
+      { $limit: parseInt(String(limit)) || 50 }
     ];
 
     const hospitals = await Hospital.aggregate(pipeline);
-    console.log(`📍 Search [${lng}, ${lat}] Result: ${hospitals.length} hospitals`);
+    console.log(`📍 Nearby Hospitals Result: ${hospitals.length} for [${lng}, ${lat}]`);
     
     res.json({ success: true, count: hospitals.length, data: hospitals });
   } catch (error) {

@@ -4,6 +4,7 @@ import { MMKV } from 'react-native-mmkv'; // will use AsyncStorage instead for c
 // Update this IP to your PC's local IP when running on physical device
 // Use 10.0.2.2 for Android emulator, or your PC's WiFi IP for physical device
 export const BASE_URL = 'http://localhost:5000/api'; // Using ADB Reverse for Physical Device
+// export const BASE_URL = 'http://10.0.2.2:5000/api'; // Use 10.0.2.2 for Android Emulator
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,

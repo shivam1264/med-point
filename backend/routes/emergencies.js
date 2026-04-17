@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { triggerSOS, getMyEmergency, getActiveEmergency, acceptEmergency, declineEmergency, completeEmergency, getAllEmergencies } = require('../controllers/emergencyController');
+const { triggerSOS, getMyEmergency, getActiveEmergency, acceptEmergency, declineEmergency, completeEmergency, cancelSOS, getAllEmergencies } = require('../controllers/emergencyController');
 const { protect, hospitalAdminOnly, ambulanceOnly } = require('../middleware/auth');
 
 // User routes
 router.post('/sos', protect, triggerSOS);
 router.get('/my', protect, getMyEmergency);
+router.patch('/:id/cancel', protect, cancelSOS);
 
 // Ambulance driver routes
 router.get('/active', protect, ambulanceOnly, getActiveEmergency);

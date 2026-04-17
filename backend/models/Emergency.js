@@ -44,7 +44,16 @@ const emergencySchema = new mongoose.Schema({
   // Timestamps for each phase
   acceptedAt: { type: Date },
   arrivedAt: { type: Date },
-  completedAt: { type: Date }
+  completedAt: { type: Date },
+  cancelledAt: { type: Date },
+  
+  // Top 5 recommendations at time of SOS
+  recommendations: [{
+    hospitalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Hospital' },
+    name: { type: String },
+    score: { type: Number },
+    distance: { type: Number }
+  }]
   
 }, { timestamps: true });
 

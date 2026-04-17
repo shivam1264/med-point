@@ -34,66 +34,79 @@ const triggerSOS = async (req, res) => {
       return res.status(400).json({ success: false, message: 'You already have an active emergency', data: activeEmergency });
     }
 
-    // Targeted Hospital Booking vs General SOS
     let nearestHospital = null;
-    let nearestAmbulance = null;
     let minHospDist = Infinity;
-    let minAmbDist = Infinity;
+    let availableAmbulanceList = [];
 
-    if (hospitalId) {
-      // User selected a specific hospital
-      nearestHospital = await Hospital.findById(hospitalId);
-      if (!nearestHospital) {
-        return res.status(404).json({ success: false, message: 'Selected hospital not found' });
-      }
-      
-      // Find nearest ambulance ONLY from this hospital
-      const availableAmbulances = await Ambulance.find({ 
-        hospital: hospitalId, 
-        isOnline: true, 
-        isAvailable: true 
-      });
-
-      for (const amb of availableAmbulances) {
-        if (amb.currentLocation && amb.currentLocation.lat) {
-          const dist = getDistanceKm(lat, lng, amb.currentLocation.lat, amb.currentLocation.lng);
-          if (dist < minAmbDist) {
-            minAmbDist = dist;
-            nearestAmbulance = amb;
-          }
-        }
-      }
-    } else {
-      // General SOS: Find nearest available ambulance from ALL
-      const availableAmbulances = await Ambulance.find({ isOnline: true, isAvailable: true });
-      for (const amb of availableAmbulances) {
-        if (amb.currentLocation && amb.currentLocation.lat) {
-          const dist = getDistanceKm(lat, lng, amb.currentLocation.lat, amb.currentLocation.lng);
-          if (dist < minAmbDist) {
-            minAmbDist = dist;
-            nearestAmbulance = amb;
-          }
-        }
-      }
-
-      // Find nearest hospital with beds for General SOS
-      const hospitals = await Hospital.find({});
-      for (const h of hospitals) {
-        if (h.coordinates && h.coordinates.lat) {
-          const dist = getDistanceKm(lat, lng, h.coordinates.lat, h.coordinates.lng);
-          if (dist < minHospDist) {
-            minHospDist = dist;
-            nearestHospital = h;
-          }
-        }
-      }
-    }
-
-    // Create emergency
+    // Prepare emergency data
     const emergencyData = {
       user: userId,
       location: { type: 'Point', coordinates: [lng, lat], address: address || 'Location detected by GPS' },
     };
+
+    if (hospitalId) {
+      // Targeted Hospital
+      nearestHospital = await Hospital.findById(hospitalId);
+      if (!nearestHospital) {
+        return res.status(404).json({ success: false, message: 'Selected hospital not found' });
+      }
+      availableAmbulanceList = await Ambulance.find({ 
+        hospital: hospitalId, 
+        isOnline: true, 
+        isAvailable: true 
+      });
+    } else {
+      // Recommendation Algorithm for SOS
+      const radius = 100000; // 100km
+      const pipeline = [
+        {
+          $geoNear: {
+            near: { type: 'Point', coordinates: [parseFloat(String(lng)), parseFloat(String(lat))] },
+            distanceField: 'distanceKm',
+            distanceMultiplier: 0.001,
+            spherical: true,
+            maxDistance: radius,
+          }
+        },
+        {
+          $addFields: {
+            distScore: { $max: [0, { $subtract: [40, { $multiply: ["$distanceKm", 2] }] }] },
+            bedScore: {
+              $cond: [{ $gt: ["$totalBeds", 0] }, { $multiply: [{ $divide: ["$availableBeds", "$totalBeds"] }, 35] }, 0]
+            },
+            ratingScore: { $multiply: [{ $divide: ["$rating", 5] }, 15] },
+            statusScore: {
+              $switch: {
+                branches: [
+                  { case: { $eq: ["$status", "green"] }, then: 10 },
+                  { case: { $eq: ["$status", "amber"] }, then: 5 },
+                  { case: { $eq: ["$status", "red"] }, then: 0 }
+                ],
+                default: 5
+              }
+            }
+          }
+        },
+        { $addFields: { score: { $add: ["$distScore", "$bedScore", "$ratingScore", "$statusScore"] } } },
+        { $sort: { score: -1 } },
+        { $limit: 5 }
+      ];
+
+      const recommendedHospitals = await Hospital.aggregate(pipeline);
+      if (recommendedHospitals.length > 0) {
+        nearestHospital = recommendedHospitals[0];
+        minHospDist = recommendedHospitals[0].distanceKm;
+        
+        emergencyData.recommendations = recommendedHospitals.map(h => ({
+          hospitalId: h._id,
+          name: h.hospitalName,
+          score: h.score,
+          distance: h.distanceKm
+        }));
+      }
+      
+      availableAmbulanceList = await Ambulance.find({ isOnline: true, isAvailable: true });
+    }
 
     if (nearestHospital) {
       emergencyData.hospital = nearestHospital._id;
@@ -103,38 +116,34 @@ const triggerSOS = async (req, res) => {
       emergencyData.hospitalLng = nearestHospital.location.coordinates[0];
     }
 
-    if (nearestAmbulance) {
-      emergencyData.ambulance = nearestAmbulance._id;
-      emergencyData.ambulanceDriverName = nearestAmbulance.driverName;
-      emergencyData.ambulanceVehicleNumber = nearestAmbulance.vehicleNumber;
-      emergencyData.ambulanceDrivrePhone = nearestAmbulance.driverPhone;
-    }
-
     const emergency = await Emergency.create(emergencyData);
 
-    // Notify ambulance via Socket.io (emitted from server)
-    if (nearestAmbulance && req.io) {
-      req.io.to(`ambulance_${nearestAmbulance._id}`).emit('new_emergency', {
-        emergencyId: emergency._id,
-        location: emergency.location,
-        hospitalName: emergency.hospitalName,
-        userId,
-        message: 'New SOS Alert! Patient needs help.'
+    // Broadcast to all available ambulances
+    if (req.io && availableAmbulanceList.length > 0) {
+      availableAmbulanceList.forEach(amb => {
+        req.io.to(`ambulance_${amb._id}`).emit('new_emergency', {
+          _id: emergency._id,
+          emergencyId: emergency._id,
+          location: emergency.location,
+          hospitalName: emergency.hospitalName,
+          userId,
+          message: 'New SOS Alert! Patient needs help.'
+        });
       });
     }
 
     res.status(201).json({
       success: true,
-      message: nearestAmbulance
-        ? `Emergency created. Ambulance ${nearestAmbulance.vehicleNumber} dispatched.`
-        : 'Emergency created. Finding available ambulance...',
+      message: availableAmbulanceList.length > 0 
+          ? `Emergency created. Alert sent to ${availableAmbulanceList.length} nearby ambulances.` 
+          : 'Emergency created. Waiting for an ambulance to come online.',
       data: emergency,
-      ambulanceDispatched: !!nearestAmbulance,
+      ambulanceDispatched: false,
       nearestHospital: nearestHospital ? {
         name: nearestHospital.hospitalName,
         address: nearestHospital.address,
         phone: nearestHospital.phone,
-        distance: `${minHospDist.toFixed(1)} km`
+        distance: minHospDist !== Infinity ? `${minHospDist.toFixed(1)} km` : 'Unknown'
       } : null
     });
   } catch (err) {
@@ -155,13 +164,33 @@ const getMyEmergency = async (req, res) => {
   }
 };
 
-// GET /api/emergencies/active — driver sees their assigned emergency
+// GET /api/emergencies/active — driver sees their assigned or pending emergency
 const getActiveEmergency = async (req, res) => {
   try {
-    const emergency = await Emergency.findOne({
+    // 1. Check if they have an active accepted/in_progress emergency
+    let emergency = await Emergency.findOne({
       ambulance: req.user.id,
-      status: { $in: ['pending', 'accepted', 'in_progress'] }
+      status: { $in: ['accepted', 'in_progress'] }
     }).populate('user', 'name phone bloodGroup');
+
+    if (emergency) {
+      return res.json({ success: true, data: emergency });
+    }
+
+    // 2. Poll for pending emergencies for their hospital
+    const driver = await Ambulance.findById(req.user.id);
+    if (!driver || !driver.isAvailable || !driver.isOnline) {
+      return res.json({ success: true, data: null });
+    }
+
+    emergency = await Emergency.findOne({
+      status: 'pending',
+      $or: [
+        { hospital: driver.hospital },
+        { hospital: null }
+      ]
+    }).populate('user', 'name phone bloodGroup').sort({ createdAt: -1 });
+
     res.json({ success: true, data: emergency });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -171,15 +200,31 @@ const getActiveEmergency = async (req, res) => {
 // PATCH /api/emergencies/:id/accept
 const acceptEmergency = async (req, res) => {
   try {
-    const emergency = await Emergency.findByIdAndUpdate(
-      req.params.id,
-      { status: 'accepted', acceptedAt: new Date() },
+    const driver = await Ambulance.findById(req.user.id);
+    if (!driver || !driver.isAvailable) {
+      return res.status(400).json({ success: false, message: 'You are not available' });
+    }
+
+    // Race condition protection: Atomically find a pending emergency and assign it.
+    const emergency = await Emergency.findOneAndUpdate(
+      { _id: req.params.id, status: 'pending' },
+      { 
+        status: 'accepted', 
+        acceptedAt: new Date(), 
+        ambulance: req.user.id,
+        ambulanceDriverName: driver.driverName,
+        ambulanceVehicleNumber: driver.vehicleNumber
+      },
       { new: true }
     );
-    if (!emergency) return res.status(404).json({ success: false, message: 'Emergency not found' });
+
+    if (!emergency) {
+      return res.status(400).json({ success: false, message: 'Emergency already accepted by someone else or cancelled.' });
+    }
 
     // Mark ambulance as unavailable
-    await Ambulance.findByIdAndUpdate(req.user.id, { isAvailable: false });
+    driver.isAvailable = false;
+    await driver.save();
 
     // Notify user via Socket.io
     if (req.io) {
@@ -221,10 +266,53 @@ const completeEmergency = async (req, res) => {
     );
     if (!emergency) return res.status(404).json({ success: false, message: 'Emergency not found' });
 
-    // Mark ambulance available again
-    await Ambulance.findByIdAndUpdate(emergency.ambulance, { isAvailable: true });
+    // Notify user via Socket.io
+    if (req.io) {
+      req.io.to(`user_${emergency.user}`).emit('emergency_completed', {
+        emergencyId: emergency._id,
+        message: 'Your emergency trip has been completed.'
+      });
+    }
 
     res.json({ success: true, message: 'Emergency completed', data: emergency });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// PATCH /api/emergencies/:id/cancel
+const cancelSOS = async (req, res) => {
+  try {
+    const emergency = await Emergency.findById(req.params.id);
+    if (!emergency) return res.status(404).json({ success: false, message: 'Emergency not found' });
+
+    // Validate ownership
+    if (!emergency.user || emergency.user.toString() !== req.user.id) {
+      return res.status(401).json({ success: false, message: 'Not authorized to cancel this emergency' });
+    }
+
+    if (['completed', 'cancelled'].includes(emergency.status)) {
+      return res.status(400).json({ success: false, message: `Emergency already ${emergency.status}` });
+    }
+
+    // Free up ambulance if one was assigned
+    if (emergency.ambulance) {
+      await Ambulance.findByIdAndUpdate(emergency.ambulance, { isAvailable: true });
+      
+      // Notify driver
+      if (req.io) {
+        req.io.to(`ambulance_${emergency.ambulance}`).emit('emergency_cancelled', {
+          emergencyId: emergency._id,
+          message: 'The user has cancelled the emergency request.'
+        });
+      }
+    }
+
+    emergency.status = 'cancelled';
+    emergency.cancelledAt = new Date();
+    await emergency.save();
+
+    res.json({ success: true, message: 'Emergency cancelled successfully', data: emergency });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -245,4 +333,4 @@ const getAllEmergencies = async (req, res) => {
   }
 };
 
-module.exports = { triggerSOS, getMyEmergency, getActiveEmergency, acceptEmergency, declineEmergency, completeEmergency, getAllEmergencies };
+module.exports = { triggerSOS, getMyEmergency, getActiveEmergency, acceptEmergency, declineEmergency, completeEmergency, cancelSOS, getAllEmergencies };

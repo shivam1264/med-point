@@ -1,94 +1,75 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Alert,
-  ActivityIndicator, Animated, StatusBar, ScrollView, PermissionsAndroid, Platform
+  ActivityIndicator, Animated, StatusBar, ScrollView, PermissionsAndroid, Platform, Modal
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Geolocation from '@react-native-community/geolocation';
 import { useAuth } from '../../context/AuthContext';
 import sosService from '../../services/sosService';
-import type { Emergency } from '../../types';
+import hospitalService from '../../services/hospitalService';
+import type { Emergency, Hospital } from '../../types';
 
 export function UserHomeScreen({ navigation }: any) {
   const { user, logout } = useAuth();
   const [activeEmergency, setActiveEmergency] = useState<Emergency | null>(null);
   const [loading, setLoading] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(true);
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const [pulseAnim] = useState(new Animated.Value(1));
 
-  // SOS pulse animation
-  useEffect(() => {
-    const pulse = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.12, duration: 800, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
-      ])
-    );
-    pulse.start();
-    return () => pulse.stop();
-  }, [pulseAnim]);
-
-  // Check if user has active emergency
-  useEffect(() => {
-    if (Platform.OS === 'android') {
-      requestLocationPermission();
-    }
-    checkActiveEmergency();
-    const interval = setInterval(checkActiveEmergency, 10000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const requestLocationPermission = async () => {
+  // 1. Helper Functions (Defined first to avoid hoisting issues)
+  async function requestLocationPermission() {
     try {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        {
-          title: 'Location Permission',
-          message: 'MedFlow needs access to your location to find nearby hospitals and dispatch ambulances.',
-          buttonNeutral: 'Ask Me Later',
-          buttonNegative: 'Cancel',
-          buttonPositive: 'OK',
-        },
-      );
-      if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-        Alert.alert('Permission Denied', 'Location access is required for SOS and Map features.');
+      if (Platform.OS === 'android') {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          {
+            title: 'Location Permission',
+            message: 'MedFlow needs access to your location for emergency dispatch.',
+            buttonNeutral: 'Ask Me Later',
+            buttonNegative: 'Cancel',
+            buttonPositive: 'OK',
+          },
+        );
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          Alert.alert('Permission Denied', 'Location access is required for SOS.');
+        }
       }
     } catch (err) {
       console.warn(err);
     }
-  };
+  }
 
-  const checkActiveEmergency = async () => {
+  async function checkActiveEmergency() {
     try {
       const emergency = await sosService.getMyEmergency();
       setActiveEmergency(emergency);
-    } catch (_) {}
-    finally { setCheckingStatus(false); }
-  };
+    } catch (_) {
+    } finally {
+      setCheckingStatus(false);
+    }
+  }
 
-  const handleSOS = () => {
+  async function handleSOS() {
     if (activeEmergency) {
-      Alert.alert('Active SOS', 'You already have an active emergency request!');
+      navigation.navigate('UserEmergencyTrack', { emergencyId: activeEmergency._id });
       return;
     }
-    // Navigate to Hospitals tab in SOS mode
     navigation.navigate('Hospitals', { isEmergency: true });
-  };
+  }
 
-  const triggerSOS = () => {
+  function triggerSOS(targetHospitalId?: string) {
     setLoading(true);
     Geolocation.getCurrentPosition(
       async (position) => {
         try {
           const { latitude: lat, longitude: lng } = position.coords;
-          const result = await sosService.triggerSOS(lat, lng);
+          const result = await sosService.triggerSOS(lat, lng, targetHospitalId);
           setActiveEmergency(result.data);
           Alert.alert(
             '🆘 SOS Sent!',
-            result.ambulanceDispatched
-              ? `Ambulance dispatched!\nNearest hospital: ${result.nearestHospital?.name}`
-              : 'Emergency created. Finding nearest ambulance...',
+            'Emergency request created. We are finding the nearest available ambulance for you.',
             [{ text: 'OK' }]
           );
         } catch (err: any) {
@@ -104,7 +85,93 @@ export function UserHomeScreen({ navigation }: any) {
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
-  };
+  }
+
+  // 2. Lifecycle Effects
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.12, duration: 800, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [pulseAnim]);
+
+  useEffect(() => {
+    requestLocationPermission();
+    checkActiveEmergency();
+
+    // 3. Real-time Status Updates via Socket
+    if (user?.id) {
+      const SOCKET_URL = 'http://localhost:5000'; // Should match backend
+      const socket = require('socket.io-client').io(SOCKET_URL, {
+        transports: ['websocket']
+      });
+
+      socket.on('connect', () => {
+        socket.emit('join_user', user.id);
+        console.log('👤 Home Socket: Joined User Room', user.id);
+      });
+
+      socket.on('emergency_accepted', (data: any) => {
+        console.log('🚑 SOS Accepted by Driver!', data);
+        checkActiveEmergency(); // Re-fetch full emergency details
+        Alert.alert('🚑 Ambulance Assigned!', `Driver ${data.driverName} has accepted your request and is on the way.`);
+      });
+
+      socket.on('emergency_cancelled', (data: any) => {
+        console.log('🆘 SOS Cancelled!', data);
+        setActiveEmergency(null);
+        Alert.alert('Cancelled', 'Your emergency request was cancelled.');
+      });
+
+      socket.on('emergency_completed', () => {
+        setActiveEmergency(null);
+        Alert.alert('Finished', 'Your emergency trip has been completed.');
+      });
+
+      return () => {
+        socket.disconnect();
+      };
+    }
+  }, [user?.id]);
+
+  async function handleCancelSOS() {
+    if (!activeEmergency) return;
+
+    Alert.alert(
+      'Cancel SOS',
+      'Are you sure you want to cancel this emergency? This will alert the ambulance driver.',
+      [
+        { text: 'No, Keep Helping', style: 'cancel' },
+        { 
+          text: 'Yes, Cancel', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              await sosService.cancelSOS(activeEmergency._id);
+              setActiveEmergency(null);
+              Alert.alert('Cancelled', 'Emergency SOS has been successfully cancelled.');
+            } catch (err: any) {
+              const errorMsg = err.response?.data?.message || "";
+              if (errorMsg.includes("already completed") || errorMsg.includes("already cancelled")) {
+                setActiveEmergency(null);
+                Alert.alert('Notice', 'This emergency has already been completed or cancelled.');
+              } else {
+                console.error('Cancel SOS Error:', err.response?.data || err.message);
+                Alert.alert('Error', 'Failed to cancel SOS. Please try again.');
+              }
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  }
 
   const getStatusColor = (status: string) => {
     if (status === 'accepted' || status === 'in_progress') return '#27AE60';
@@ -147,6 +214,22 @@ export function UserHomeScreen({ navigation }: any) {
               {activeEmergency.hospitalName && (
                 <Text style={styles.emergencyBannerSub}>Hospital: {activeEmergency.hospitalName}</Text>
               )}
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+                {(activeEmergency.status === 'accepted' || activeEmergency.status === 'in_progress') && (
+                  <TouchableOpacity
+                    style={{ backgroundColor: '#378ADD', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8 }}
+                    onPress={() => navigation.navigate('UserEmergencyTrack', { emergencyId: activeEmergency._id })}
+                  >
+                    <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Track Live</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  style={{ backgroundColor: '#222', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: '#444' }}
+                  onPress={handleCancelSOS}
+                >
+                  <Text style={{ color: '#E74C3C', fontSize: 12, fontWeight: '700' }}>Cancel SOS</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         )}
@@ -194,14 +277,6 @@ export function UserHomeScreen({ navigation }: any) {
             <Text style={styles.cardLabel}>Emergency{'\n'}Service</Text>
           </View>
         </View>
-
-        {/* Tip */}
-        <View style={styles.tipCard}>
-          <Icon name="information-outline" size={20} color="#378ADD" />
-          <Text style={styles.tipText}>
-            Tap SOS to instantly alert nearby ambulances with your GPS location. Help will arrive ASAP.
-          </Text>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -236,19 +311,12 @@ const styles = StyleSheet.create({
   },
   sosBtnActive: { backgroundColor: '#27AE60', shadowColor: '#27AE60' },
   sosBtnText: { fontSize: 32, fontWeight: '800', color: '#fff', marginTop: 4 },
-  sosBtnSub: { fontSize: 11, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
   sosNote: { fontSize: 13, color: '#666', textAlign: 'center' },
-  cards: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 16, marginBottom: 20 },
+  cards: { flexDirection: 'row', marginTop: 20 },
   infoCard: {
     flex: 1, backgroundColor: '#1A1A1A', borderRadius: 14,
     padding: 16, alignItems: 'center', marginHorizontal: 4
   },
   cardNum: { fontSize: 22, fontWeight: '800', color: '#fff', marginTop: 8 },
   cardLabel: { fontSize: 11, color: '#888', textAlign: 'center', marginTop: 4 },
-  tipCard: {
-    flexDirection: 'row', alignItems: 'flex-start',
-    backgroundColor: '#0A1628', borderRadius: 12,
-    padding: 14, borderWidth: 1, borderColor: '#1A3A5C', gap: 10
-  },
-  tipText: { flex: 1, fontSize: 13, color: '#aaa', lineHeight: 20 },
 });
