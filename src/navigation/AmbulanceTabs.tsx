@@ -4,9 +4,20 @@ import { createStackNavigator } from '@react-navigation/stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { AmbulanceHomeScreen } from '../screens/ambulance/AmbulanceHomeScreen';
 import { AmbulanceNavScreen } from '../screens/ambulance/AmbulanceNavScreen';
+import { AmbulanceProfileScreen } from '../screens/ambulance/AmbulanceProfileScreen';
 
-const Tab = createBottomTabNavigator();
-const Stack = createStackNavigator();
+export type AmbTabParamList = {
+  Home: undefined;
+  Profile: undefined;
+};
+
+export type AmbStackParamList = {
+  AmbTabs: undefined;
+  AmbulanceNav: { emergency: any };
+};
+
+const Tab = createBottomTabNavigator<AmbTabParamList>();
+const Stack = createStackNavigator<AmbStackParamList>();
 
 const tabBarStyle = {
   backgroundColor: '#111',
@@ -26,11 +37,19 @@ function AmbulanceTabNavigator() {
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       }}>
       <Tab.Screen
-        name="AmbHome"
+        name="Home"
         component={AmbulanceHomeScreen}
         options={{
           tabBarLabel: 'Dashboard',
-          tabBarIcon: ({ color, size }) => <Icon name="ambulance" size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <Icon name="view-dashboard" size={size} color={color} />,
+        }}
+      />
+      <Tab.Screen
+        name="Profile"
+        component={AmbulanceProfileScreen}
+        options={{
+          tabBarLabel: 'Profile',
+          tabBarIcon: ({ color, size }) => <Icon name="account" size={size} color={color} />,
         }}
       />
     </Tab.Navigator>

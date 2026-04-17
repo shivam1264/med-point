@@ -30,8 +30,22 @@ const triggerSOS = async (req, res) => {
       user: userId,
       status: { $in: ['pending', 'accepted', 'in_progress'] }
     });
+
     if (activeEmergency) {
-      return res.status(400).json({ success: false, message: 'You already have an active emergency', data: activeEmergency });
+      if (activeEmergency.status === 'pending') {
+        // Auto-cancel old pending request to allow switching hospitals
+        console.log('Auto-cancelling old pending SOS to allow new request');
+        activeEmergency.status = 'cancelled';
+        activeEmergency.cancelledAt = new Date();
+        await activeEmergency.save();
+      } else {
+        // Driver already assigned, must cancel manually
+        return res.status(400).json({ 
+          success: false, 
+          message: `Ambulance already ${activeEmergency.status}. Please cancel it first before re-requesting.`, 
+          data: activeEmergency 
+        });
+      }
     }
 
     let nearestHospital = null;
@@ -157,7 +171,7 @@ const getMyEmergency = async (req, res) => {
     const emergency = await Emergency.findOne({
       user: req.user.id,
       status: { $in: ['pending', 'accepted', 'in_progress'] }
-    }).populate('ambulance', 'driverName vehicleNumber driverPhone').populate('hospital', 'hospitalName address phone');
+    }).populate('ambulance', 'driverName vehicleNumber driverPhone location').populate('hospital', 'hospitalName address phone');
     res.json({ success: true, data: emergency });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

@@ -9,11 +9,13 @@ import { DoctorScreen } from '../screens/user/DoctorScreen';
 import { UserMapScreen } from '../screens/user/UserMapScreen';
 
 import { UserEmergencyTrackScreen } from '../screens/user/UserEmergencyTrackScreen';
+import { UserProfileScreen } from '../screens/user/UserProfileScreen';
 
 export type UserTabParamList = {
   Home: undefined;
   Hospitals: undefined;
   Doctors: undefined;
+  Profile: undefined;
 };
 
 export type UserStackParamList = {
@@ -64,6 +66,14 @@ function UserTabNavigator() {
         options={{
           tabBarLabel: 'Doctors',
           tabBarIcon: ({ color, size }) => <Icon name="doctor" size={size} color={color} />,
+        }}
+      />
+      <Tab.Screen
+        name="Profile"
+        component={UserProfileScreen}
+        options={{
+          tabBarLabel: 'Profile',
+          tabBarIcon: ({ color, size }) => <Icon name="account" size={size} color={color} />,
         }}
       />
     </Tab.Navigator>

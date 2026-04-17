@@ -153,4 +153,56 @@ const createHospitalAdmin = async (req, res) => {
   }
 };
 
-module.exports = { registerUser, loginUser, loginAmbulance, loginHospital, createHospitalAdmin };
+// GET /api/auth/profile
+const getProfile = async (req, res) => {
+  try {
+    const { id, role } = req.user;
+    let data;
+    if (role === 'user') {
+      data = await User.findById(id).select('-password');
+    } else if (role === 'ambulance') {
+      data = await Ambulance.findById(id).select('-password');
+    } else if (role === 'hospital_admin') {
+      data = await HospitalAdmin.findOne({ hospital: req.user.hospitalId }).select('-password');
+    }
+
+    if (!data) return res.status(404).json({ success: false, message: 'Profile not found' });
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// PUT /api/auth/profile
+const updateProfile = async (req, res) => {
+  try {
+    const { id, role } = req.user;
+    const updates = req.body;
+
+    // Prevent role/password updates through this endpoint for safety
+    delete updates.role;
+    delete updates.password;
+    delete updates.driverId; // Ambulance specific
+    delete updates.hospital; // Ambulance specific
+
+    let updated;
+    if (role === 'user') {
+      updated = await User.findByIdAndUpdate(id, updates, { new: true, runValidators: true }).select('-password');
+    } else if (role === 'ambulance') {
+      // Drivers can only update personal info, not vehicle/hospital info
+      const allowed = { 
+        driverName: updates.driverName, 
+        driverPhone: updates.driverPhone 
+      };
+      updated = await Ambulance.findByIdAndUpdate(id, allowed, { new: true, runValidators: true }).select('-password');
+    }
+
+    if (!updated) return res.status(404).json({ success: false, message: 'Profile not found' });
+    res.json({ success: true, message: 'Profile updated successfully', data: updated });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+module.exports = { registerUser, loginUser, loginAmbulance, loginHospital, createHospitalAdmin, getProfile, updateProfile };
+

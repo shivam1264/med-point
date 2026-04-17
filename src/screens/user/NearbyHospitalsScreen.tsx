@@ -90,7 +90,7 @@ export function NearbyHospitalsScreen({ navigation }: any) {
         setLoading(false);
         setRefreshing(false);
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+      { enableHighAccuracy: true, timeout: 25000, maximumAge: 10000 }
     );
   };
 

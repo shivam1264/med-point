@@ -4,6 +4,7 @@ import {
   ActivityIndicator, Animated, StatusBar, ScrollView, PermissionsAndroid, Platform, Modal
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Geolocation from '@react-native-community/geolocation';
 import { useAuth } from '../../context/AuthContext';
@@ -83,7 +84,7 @@ export function UserHomeScreen({ navigation }: any) {
         setLoading(false);
         Alert.alert('Location Error', 'Could not get your location. Please enable GPS.');
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy: true, timeout: 25000, maximumAge: 10000 }
     );
   }
 

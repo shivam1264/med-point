@@ -43,8 +43,11 @@ export function UserEmergencyTrackScreen({ route, navigation }: any) {
     });
 
     socket.on('ambulance_location_update', (data: any) => {
-      // If we have an emergency and the broadcasted ambulance matches our delegated one
-      if (emergency?.ambulance?._id === data.ambulanceId) {
+      console.log('Location Update received for:', data.ambulanceId);
+      // Ensure we compare IDs correctly as strings
+      const currentAmbId = emergency?.ambulance?._id || emergency?.ambulance;
+      if (currentAmbId && currentAmbId.toString() === data.ambulanceId.toString()) {
+        console.log('Matching Ambulance! Updating markers...');
         setAmbLoc({ lat: data.lat, lng: data.lng });
       }
     });

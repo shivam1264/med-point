@@ -96,7 +96,8 @@ export function AmbulanceHomeScreen({ navigation }: any) {
             currentLocation: { lat: coords.latitude, lng: coords.longitude }
           }).catch(() => {});
         },
-        () => {}
+        () => {},
+        { enableHighAccuracy: true, timeout: 20000, maximumAge: 10000 }
       );
     };
     updateLoc();

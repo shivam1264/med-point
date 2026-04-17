@@ -125,21 +125,23 @@ export function DoctorScreen() {
       </View>
 
       {/* Specialty chips */}
-      <FlatList
-        horizontal
-        data={specialties}
-        keyExtractor={(item) => item}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.chips}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[styles.chip, selectedSpec === item && styles.chipActive]}
-            onPress={() => setSelectedSpec(item)}>
-            <Text style={[styles.chipText, selectedSpec === item && styles.chipTextActive]}>{item}</Text>
-          </TouchableOpacity>
-        )}
-        style={{ maxHeight: 48, marginBottom: 8 }}
-      />
+      <View style={styles.specListContainer}>
+        <FlatList
+          horizontal
+          data={specialties}
+          keyExtractor={(item) => item}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chips}
+          ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[styles.chip, selectedSpec === item && styles.chipActive]}
+              onPress={() => setSelectedSpec(item)}>
+              <Text style={[styles.chipText, selectedSpec === item && styles.chipTextActive]}>{item}</Text>
+            </TouchableOpacity>
+          )}
+        />
+      </View>
 
       {loading ? (
         <View style={styles.center}>
@@ -178,14 +180,16 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#2A2A2A'
   },
   searchInput: { flex: 1, color: '#fff', fontSize: 15, paddingVertical: 10 },
-  chips: { paddingHorizontal: 16, gap: 8 },
+  specListContainer: { height: 50, marginBottom: 12 },
+  chips: { paddingHorizontal: 16, alignItems: 'center' },
   chip: {
     backgroundColor: '#1A1A1A', borderRadius: 20,
-    paddingHorizontal: 14, paddingVertical: 7,
-    borderWidth: 1, borderColor: '#2A2A2A'
+    paddingHorizontal: 16, paddingVertical: 8,
+    borderWidth: 1, borderColor: '#2A2A2A',
+    height: 38, justifyContent: 'center', alignItems: 'center'
   },
   chipActive: { backgroundColor: '#C0392B', borderColor: '#C0392B' },
-  chipText: { fontSize: 12, color: '#888', fontWeight: '600' },
+  chipText: { fontSize: 13, color: '#888', fontWeight: '600' },
   chipTextActive: { color: '#fff' },
   list: { paddingHorizontal: 16, paddingBottom: 32, paddingTop: 8 },
   card: {
