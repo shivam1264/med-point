@@ -26,37 +26,23 @@ export default function BedManagement() {
 
   const loadHospital = async (hid?: string) => {
     try {
-      if (hid) {
-        const res = await api.get(`/hospitals/${hid}`);
-        const h = res.data.data || res.data;
-        if (h && h._id) {
-          setHospital(h);
-          setLocalData({
-            icu: h.icuAvailable ?? 0,
-            general: h.availableBeds ?? 0,
-            vent: h.ventilatorsAvailable ?? 0,
-            status: h.status || 'green'
-          });
-          setLoading(false);
-          return;
-        }
+      if (!hid) return;
+      const res = await api.get(`/hospitals/${hid}`);
+      const h = res.data.data || res.data;
+      if (h && h._id) {
+        setHospital(h);
+        setLocalData({
+          icu: h.icuAvailable ?? 0,
+          general: h.availableBeds ?? 0,
+          vent: h.ventilatorsAvailable ?? 0,
+          status: h.status || 'green'
+        });
       }
-      throw new Error("Not found");
-    } catch (e) {
-      try {
-        const res = await api.get(`/hospitals?limit=100`);
-        const list = res.data.data || [];
-        const found = list.find((h: Hospital) => 
-          (hid && h._id === hid) || 
-          (admin?.hospitalName && h.hospitalName === admin.hospitalName)
-        );
-        if (found) {
-          setHospital(found);
-          setLocalData({ icu: found.icuAvailable ?? 0, general: found.availableBeds ?? 0, vent: found.ventilatorsAvailable ?? 0, status: found.status || 'green' });
-        }
-      } catch (_) {}
+    } catch (_) {
+      console.error("Hospital record not found.");
+    } finally {
+      setLoading(false);
     }
-    finally { setLoading(false); }
   };
 
   const change = (field: 'icu' | 'general' | 'vent', delta: number) => {

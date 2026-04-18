@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { api } from '../context/AuthContext';
+import { api, useAuth } from '../context/AuthContext';
 import '../styles/pages.css';
 
 interface Stats { hospitals: number; doctors: number; ambulances: number; emergencies: number; }
 
 export default function Dashboard() {
+  const { admin } = useAuth();
   const [stats, setStats] = useState<Stats>({ hospitals: 0, doctors: 0, ambulances: 0, emergencies: 0 });
   const [recentEmergencies, setRecentEmergencies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -17,28 +18,41 @@ export default function Dashboard() {
 
   const loadDashboard = async () => {
     try {
-      const [hosp, docs, ambs, emers] = await Promise.all([
-        api.get('/hospitals?limit=1'),
-        api.get('/doctors'),
-        api.get('/ambulances'),
-        api.get('/emergencies'),
+      const hid = admin?.hospitalId;
+      const [docs, ambs, emers] = await Promise.all([
+        api.get(`/doctors${hid ? `?hospitalId=${hid}` : ''}`),
+        api.get(`/ambulances${hid ? `?hospitalId=${hid}` : ''}`),
+        api.get(`/emergencies${hid ? `?hospitalId=${hid}` : ''}`),
       ]);
+      const doctors_list = docs.data.data || [];
+      const ambulances_list = ambs.data.data || [];
+      const emergencies_list = emers.data.data || [];
+
+      // Safety filter: double-check that all displayed emergencies are for this hospital
+      const filteredEmergencies = emergencies_list.filter((e: any) => 
+        (e.hospital === hid) || 
+        (e.hospital?._id === hid) || 
+        (e.hospitalName === admin?.hospitalName)
+      );
+      const filteredDoctors = doctors_list.filter((d: any) => d.hospital === hid || d.hospital?._id === hid);
+      const filteredAmbulances = ambulances_list.filter((a: any) => a.hospital === hid || a.hospital?._id === hid);
+
       setStats({
-        hospitals: hosp.data.total || hosp.data.count || 0,
-        doctors: docs.data.count || 0,
-        ambulances: ambs.data.count || 0,
-        emergencies: emers.data.count || 0,
+        hospitals: 1,
+        doctors: filteredDoctors.length,
+        ambulances: filteredAmbulances.length,
+        emergencies: filteredEmergencies.length,
       });
-      setRecentEmergencies((emers.data.data || []).slice(0, 8));
+      setRecentEmergencies(filteredEmergencies.slice(0, 8));
     } catch (_) {}
     finally { setLoading(false); }
   };
 
   const statCards = [
-    { icon: '🏥', value: stats.hospitals, label: 'Hospitals', color: 'var(--danger)' },
     { icon: '👨‍⚕️', value: stats.doctors, label: 'Doctors', color: 'var(--success)' },
     { icon: '🚑', value: stats.ambulances, label: 'Ambulances', color: 'var(--primary)' },
-    { icon: '🆘', value: stats.emergencies, label: 'Total Emergencies', color: 'var(--warning)' },
+    { icon: '🆘', value: stats.emergencies, label: 'Today Cases', color: 'var(--warning)' },
+    { icon: '🏥', value: 'Active', label: 'Hospital Status', color: 'var(--danger)' },
   ];
 
   const statusBadge = (status: string) => {
@@ -55,8 +69,8 @@ export default function Dashboard() {
   return (
     <div className="page">
       <header>
-        <h1 className="page-title">Healthcare Dashboard</h1>
-        <p className="page-sub">Live monitoring system for medical emergencies and resource allocation.</p>
+        <h1 className="page-title">{admin?.hospitalName || 'Healthcare Dashboard'}</h1>
+        <p className="page-sub">Central Management Terminal for <strong>{admin?.hospitalName}</strong></p>
       </header>
 
       <div className="stats-grid">
@@ -71,30 +85,6 @@ export default function Dashboard() {
         ))}
       </div>
 
-      <div className="trend-section">
-        <h2 className="section-heading">Hourly Emergency Distribution</h2>
-        <div className="trend-card">
-          <div className="chart-placeholder">
-            <svg width="100%" height="180" viewBox="0 0 400 180" preserveAspectRatio="none">
-              <defs>
-                <linearGradient id="grad" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.2} />
-                  <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <path d="M0,160 L50,130 L100,140 L150,80 L200,110 L250,60 L300,90 L350,40 L400,70 L400,180 L0,180 Z" fill="url(#grad)" />
-              <path d="M0,160 L50,130 L100,140 L150,80 L200,110 L250,60 L300,90 L350,40 L400,70" fill="none" stroke="var(--primary)" strokeWidth="3" strokeLinecap="round" />
-            </svg>
-            <div className="chart-labels">
-              <span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>23:59</span>
-            </div>
-          </div>
-          <div className="trend-info">
-             <div className="trend-stat"><span>High Volume Peak</span><strong>14:00 - 16:30</strong></div>
-             <div className="trend-stat"><span>Response Status</span><strong style={{ color: 'var(--success)' }}>OPTIMAL</strong></div>
-          </div>
-        </div>
-      </div>
 
       <h2 className="section-heading">Live Incident Stream</h2>
       <div className="table-card">

@@ -102,6 +102,12 @@ io.on('connection', (socket) => {
     }
   });
 
+  // User sends live location
+  socket.on('user_location', async ({ userId, lat, lng }) => {
+    // Broadcast to any ambulance listeners
+    io.emit('user_location_update', { userId, lat, lng, timestamp: new Date() });
+  });
+
   socket.on('disconnect', () => {
     console.log(`🔌 Socket disconnected: ${socket.id}`);
   });

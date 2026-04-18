@@ -19,8 +19,8 @@ interface Props {
 
 export function AmbulanceNavScreen({ route, navigation }: Props) {
   const { emergency } = route.params;
-  const patLat = emergency.location?.coordinates?.[1] ?? 23.25;
-  const patLng = emergency.location?.coordinates?.[0] ?? 77.41;
+  const [patLat, setPatLat] = React.useState(emergency.location?.coordinates?.[1] ?? 23.25);
+  const [patLng, setPatLng] = React.useState(emergency.location?.coordinates?.[0] ?? 77.41);
   const hospLat = emergency.hospitalLat ?? 23.21;
   const hospLng = emergency.hospitalLng ?? 77.44;
   const [routePoints, setRoutePoints] = React.useState<RoutePoint[]>([]);
@@ -55,6 +55,14 @@ export function AmbulanceNavScreen({ route, navigation }: Props) {
         'Patient has cancelled the request. Returning to base.',
         [{ text: 'OK', onPress: () => navigation.navigate('AmbTabs') }]
       );
+    });
+    
+    socket.on('user_location_update', (data: any) => {
+      if (data.userId === (emergency.user?._id || emergency.user)) {
+        console.log('User Location Update:', data.lat, data.lng);
+        setPatLat(data.lat);
+        setPatLng(data.lng);
+      }
     });
 
     Geolocation.getCurrentPosition(

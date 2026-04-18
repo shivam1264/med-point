@@ -360,7 +360,11 @@ const cancelSOS = async (req, res) => {
 // GET /api/emergencies — hospital admin sees all
 const getAllEmergencies = async (req, res) => {
   try {
-    const emergencies = await Emergency.find()
+    const { hospitalId } = req.query;
+    const filter = {};
+    if (hospitalId) filter.hospital = hospitalId;
+
+    const emergencies = await Emergency.find(filter)
       .populate('user', 'name phone')
       .populate('ambulance', 'driverName vehicleNumber')
       .populate('hospital', 'hospitalName')

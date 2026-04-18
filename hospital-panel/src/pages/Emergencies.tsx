@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api } from '../context/AuthContext';
+import { api, useAuth } from '../context/AuthContext';
 import '../styles/pages.css';
 
 interface Emergency {
@@ -17,6 +17,7 @@ const statusBadge = (s: string) => {
 const severityBadge = (s: string) => s === 'critical' ? 'badge-red' : s === 'moderate' ? 'badge-amber' : 'badge-gray';
 
 export default function Emergencies() {
+  const { admin } = useAuth();
   const [emergencies, setEmergencies] = useState<Emergency[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
@@ -29,8 +30,16 @@ export default function Emergencies() {
 
   const loadEmergencies = async () => {
     try {
-      const res = await api.get('/emergencies');
-      setEmergencies(res.data.data || []);
+      const hid = admin?.hospitalId;
+      const res = await api.get(`/emergencies${hid ? `?hospitalId=${hid}` : ''}`);
+      const list = res.data.data || [];
+      // Safety filter: ensure no stray data from other hospitals appears
+      const filtered = list.filter((e: any) => 
+        (e.hospital === hid) || 
+        (e.hospital?._id === hid) || 
+        (e.hospitalName === admin?.hospitalName)
+      );
+      setEmergencies(filtered);
     } catch (_) {}
     finally { setLoading(false); }
   };
@@ -44,7 +53,7 @@ export default function Emergencies() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Emergency Cases</h1>
-          <p className="page-sub">Live SOS alerts — auto-refreshes every 10s</p>
+          <p className="page-sub">Live SOS alerts for <strong>{admin?.hospitalName}</strong> — auto-refreshes every 10s</p>
         </div>
         <div className="live-badge">🔴 LIVE</div>
       </div>

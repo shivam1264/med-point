@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { io, Socket } from 'socket.io-client';
+import Geolocation from '@react-native-community/geolocation';
 import sosService from '../../services/sosService';
 import mapService, { RoutePoint } from '../../services/mapService';
 
@@ -19,11 +20,13 @@ export function UserEmergencyTrackScreen({ route, navigation }: any) {
   const [routePoints, setRoutePoints] = useState<RoutePoint[]>([]);
   const mapRef = useRef<MapView>(null);
   const socketRef = useRef<Socket | null>(null);
+  const emergencyRef = useRef<any>(null);
 
   useEffect(() => {
     // 1. Fetch initial emergency info
     sosService.getMyEmergency().then((data: any) => {
       setEmergency(data);
+      emergencyRef.current = data;
       // Fallback: If ambulance has last location
       if (data?.ambulance?.location?.coordinates) {
         setAmbLoc({
@@ -34,9 +37,7 @@ export function UserEmergencyTrackScreen({ route, navigation }: any) {
     });
 
     // 2. Setup socket
-    const socket = io(SOCKET_URL, {
-      transports: ['websocket']
-    });
+    const socket = io(SOCKET_URL, { transports: ['websocket'] });
     socketRef.current = socket;
 
     socket.on('connect', () => {
@@ -46,8 +47,7 @@ export function UserEmergencyTrackScreen({ route, navigation }: any) {
     socket.on('ambulance_location_update', (data: any) => {
       console.log('Location Update received for:', data.ambulanceId);
       
-      // The emergency object might have ambulance as an ID string or a populated object
-      const ambulanceData = emergency?.ambulance;
+      const ambulanceData = emergencyRef.current?.ambulance;
       const currentAmbId = typeof ambulanceData === 'string' ? ambulanceData : ambulanceData?._id;
 
       if (currentAmbId && currentAmbId.toString() === data.ambulanceId.toString()) {
@@ -56,10 +56,35 @@ export function UserEmergencyTrackScreen({ route, navigation }: any) {
       }
     });
 
+    const getUserId = () => {
+      const u = emergencyRef.current?.user;
+      return typeof u === 'string' ? u : u?._id || 'anonymous_user';
+    };
+
+    // 3. Watch own location and emit to ambulance
+    Geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        socket.emit('user_location', { userId: getUserId(), lat: latitude, lng: longitude });
+      },
+      (err) => console.warn('User Loc:', err),
+      { enableHighAccuracy: true }
+    );
+
+    const watchId = Geolocation.watchPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        socket.emit('user_location', { userId: getUserId(), lat: latitude, lng: longitude });
+      },
+      (err) => console.warn('User Nav Loc:', err),
+      { enableHighAccuracy: true, distanceFilter: 10, interval: 3000 }
+    );
+
     return () => {
       socket.disconnect();
+      Geolocation.clearWatch(watchId);
     };
-  }, [emergency?.ambulance?._id]);
+  }, [emergencyId]);
 
   useEffect(() => {
     // Re-center map if both locations are known
