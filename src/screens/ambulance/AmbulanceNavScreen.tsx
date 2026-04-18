@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Linking, Modal, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Linking, Modal, TextInput, ActivityIndicator, StatusBar, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -7,9 +7,10 @@ import { io, Socket } from 'socket.io-client';
 import Geolocation from '@react-native-community/geolocation';
 import { useAuth } from '../../context/AuthContext';
 import mapService, { RoutePoint } from '../../services/mapService';
+import sosService from '../../services/sosService';
 import { SOCKET_URL } from '../../config';
+import { Colors } from '../../constants/colors';
 import type { Emergency } from '../../types';
-
 
 interface Props {
   route: { params: { emergency: Emergency } };
@@ -34,8 +35,6 @@ export function AmbulanceNavScreen({ route, navigation }: Props) {
   const socketRef = React.useRef<Socket | null>(null);
   const mapRef = React.useRef<MapView | null>(null);
 
-  console.log('Nav Screen Params:', { patLat, patLng, hospLat, hospLng });
-
   // Broadast live location to patient
   React.useEffect(() => {
     if (!driver?.id) return;
@@ -47,27 +46,23 @@ export function AmbulanceNavScreen({ route, navigation }: Props) {
     socketRef.current = socket;
 
     socket.on('connect', () => {
-      console.log('Nav Screen Socket connected');
-      // Must join the room to receive targeted cancellations
       socket.emit('join_ambulance', driver.id);
     });
 
     socket.on('emergency_cancelled', (data: any) => {
-      console.log('SOS Cancelled while navigating!', data);
       Alert.alert(
-        'SOS Cancelled',
-        'User has cancelled the emergency request. Returning to home screen.',
+        'Mission Aborted',
+        'Patient has cancelled the request. Returning to base.',
         [{ text: 'OK', onPress: () => navigation.navigate('AmbTabs') }]
       );
     });
 
-    // Get an immediate first location fix
     Geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
         setDriverLoc({ latitude, longitude });
       },
-      (err) => console.warn('First fix error:', err),
+      (err) => console.warn('Loc update:', err),
       { enableHighAccuracy: true }
     );
 
@@ -75,14 +70,13 @@ export function AmbulanceNavScreen({ route, navigation }: Props) {
       (pos) => {
         const { latitude, longitude } = pos.coords;
         setDriverLoc({ latitude, longitude });
-        
         socket.emit('driver_location', {
           ambulanceId: driver.id,
           lat: latitude,
           lng: longitude
         });
       },
-      (err) => console.warn('Nav Location Error:', err),
+      (err) => console.warn('Nav Loc:', err),
       { enableHighAccuracy: true, distanceFilter: 10, interval: 3000 }
     );
 
@@ -92,12 +86,11 @@ export function AmbulanceNavScreen({ route, navigation }: Props) {
     };
   }, [driver?.id]);
 
-  // Fetch route periodically or on phase change
+  // Fetch route periodically
   React.useEffect(() => {
     const fetchNewRoute = async () => {
       if (!driverLoc) return;
 
-      // Re-fetch if phase changed OR if moved > 50m
       if (lastUpdate && lastUpdate.phase === phase) {
         const dist = Math.sqrt(
           Math.pow(driverLoc.latitude - lastUpdate.loc.latitude, 2) + 
@@ -109,35 +102,22 @@ export function AmbulanceNavScreen({ route, navigation }: Props) {
       const dest = phase === 'PICKUP' 
         ? { lat: patLat, lng: patLng } 
         : { lat: hospLat, lng: hospLng };
-
-      console.log(`Calculating route (${phase}):`, driverLoc, 'to', dest);
       
       try {
         const result = await mapService.getRoute(
           { lat: driverLoc.latitude, lng: driverLoc.longitude },
           dest
         );
-
-        if (result.status !== 'OK' && result.error) {
-          console.warn('Routing Diagnostic:', result.status, result.error);
-          // Show alert only once to diagnose
-          Alert.alert(
-            'Google API Alert',
-            `Status: ${result.status}\nMessage: ${result.error || 'Enable Directions API in Console'}`
-          );
-        }
-
         setRoutePoints(result.points);
         setLastUpdate({ phase, loc: driverLoc });
       } catch (err) {
-        console.warn('Route fetch error:', err);
+        console.warn('Routing err:', err);
       }
     };
 
     fetchNewRoute();
   }, [driverLoc?.latitude, driverLoc?.longitude, phase]);
 
-  // Auto-zoom to fit both points when driver location is first received
   React.useEffect(() => {
     if (driverLoc && mapRef.current) {
       const dest = phase === 'PICKUP' 
@@ -146,24 +126,23 @@ export function AmbulanceNavScreen({ route, navigation }: Props) {
       
       mapRef.current.fitToCoordinates(
         [{ latitude: driverLoc.latitude, longitude: driverLoc.longitude }, dest],
-        { edgePadding: { top: 100, right: 50, bottom: 200, left: 50 }, animated: true }
+        { edgePadding: { top: 100, right: 50, bottom: 250, left: 50 }, animated: true }
       );
     }
-  }, [driverLoc === null, phase]); // Run when driverLoc first goes from null to something, or phase changes
+  }, [driverLoc === null, phase]);
   
   const handleComplete = async () => {
     if (otpInput !== emergency.pickupOTP) {
-      Alert.alert('Invalid OTP', 'Ask patient for the correct code.');
+      Alert.alert('Verification Failed', 'The pickup OTP does not match.');
       return;
     }
 
     try {
       setLoading(true);
       await sosService.completeEmergency(emergency._id, otpInput);
-      Alert.alert('✅ Success', 'Emergency completed!', [{ text: 'OK', onPress: () => navigation.navigate('AmbTabs') }]);
+      Alert.alert('Mission Complete', 'Patient successfully handed over.', [{ text: 'OK', onPress: () => navigation.navigate('AmbTabs') }]);
     } catch (err: any) {
-      const msg = err.response?.data?.message || 'Could not complete emergency';
-      Alert.alert('Error', msg);
+      Alert.alert('Error', 'Unable to finalize mission.');
     } finally {
       setLoading(false);
     }
@@ -171,214 +150,208 @@ export function AmbulanceNavScreen({ route, navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+      
       <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-        <Icon name="arrow-left" size={22} color="#fff" />
+        <Icon name="chevron-left" size={28} color={Colors.textPrimary} />
       </TouchableOpacity>
 
       <MapView
         ref={mapRef}
         style={styles.map}
         provider={PROVIDER_GOOGLE}
-        showsUserLocation
+        showsUserLocation={false}
         initialRegion={{ latitude: patLat, longitude: patLng, latitudeDelta: 0.06, longitudeDelta: 0.06 }}>
-        <Marker coordinate={{ latitude: patLat, longitude: patLng }} title="Patient">
-          <View style={styles.patientMarker}><Icon name="account" size={20} color="#fff" /></View>
-        </Marker>
-        <Marker coordinate={{ latitude: hospLat, longitude: hospLng }} title={emergency.hospitalName || 'Hospital'}>
-          <View style={styles.hospMarker}><Icon name="hospital-building" size={20} color="#fff" /></View>
+        
+        {/* Patient Marker */}
+        <Marker coordinate={{ latitude: patLat, longitude: patLng }}>
+          <View style={[styles.markerRing, { borderColor: Colors.info + '40' }]}>
+             <View style={[styles.markerCore, { backgroundColor: Colors.info }]}>
+                <Icon name="account" size={16} color={Colors.white} />
+             </View>
+          </View>
         </Marker>
 
-        {/* Live Ambulance Marker */}
+        {/* Hospital Marker */}
+        <Marker coordinate={{ latitude: hospLat, longitude: hospLng }}>
+           <View style={[styles.markerRing, { borderColor: Colors.danger + '40' }]}>
+              <View style={[styles.markerCore, { backgroundColor: Colors.danger }]}>
+                 <Icon name="hospital-building" size={18} color={Colors.white} />
+              </View>
+           </View>
+        </Marker>
+
+        {/* Ambulance Local Marker */}
         {driverLoc && (
-          <Marker coordinate={driverLoc} title="Your Location">
+          <Marker coordinate={driverLoc} flat rotation={0}>
              <View style={styles.ambMarker}>
-               <Icon name="ambulance" size={24} color={phase === 'PICKUP' ? '#378ADD' : '#C0392B'} />
+                <Icon name="truck-delivery" size={24} color={Colors.success} />
              </View>
           </Marker>
         )}
         
-        {routePoints.length > 0 ? (
-          <>
-            {/* Shadow/Glow Background */}
-            <Polyline
-              coordinates={routePoints}
-              strokeColor={phase === 'PICKUP' ? '#378ADD30' : '#C0392B30'}
-              strokeWidth={12}
-            />
-            {/* Main Primary Line */}
-            <Polyline
-              coordinates={routePoints}
-              strokeColor={phase === 'PICKUP' ? '#378ADD' : '#C0392B'}
-              strokeWidth={6}
-              lineJoin="round"
-              lineCap="round"
-            />
-          </>
-        ) : (
-          <>
-            <Polyline
-              coordinates={[{ latitude: patLat, longitude: patLng }, { latitude: hospLat, longitude: hospLng }]}
-              strokeColor={phase === 'PICKUP' ? '#378ADD20' : '#C0392B20'}
-              strokeWidth={6}
-            />
-            <Polyline
-              coordinates={[{ latitude: patLat, longitude: patLng }, { latitude: hospLat, longitude: hospLng }]}
-              strokeColor={phase === 'PICKUP' ? '#378ADD' : '#C0392B'}
-              strokeWidth={4}
-              lineDashPattern={[10, 5]}
-            />
-          </>
+        {routePoints.length > 0 && (
+          <Polyline
+            coordinates={routePoints}
+            strokeColor={phase === 'PICKUP' ? Colors.info : Colors.danger}
+            strokeWidth={5}
+            lineJoin="round"
+            lineCap="round"
+          />
         )}
       </MapView>
 
-      {/* OTP Modal */}
-      <Modal transparent visible={showOtpModal} animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.otpModalCard}>
-            <Text style={styles.otpModalTitle}>Verify Patient OTP</Text>
-            <Text style={styles.otpModalSub}>Ask patient for the code to complete trip.</Text>
-            <TextInput
-              style={styles.otpInput}
-              placeholder="0000"
-              placeholderTextColor="#444"
-              keyboardType="number-pad"
-              maxLength={4}
-              value={otpInput}
-              onChangeText={setOtpInput}
-              autoFocus
-            />
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.declineBtn} onPress={() => { setShowOtpModal(false); setOtpInput(''); }}>
-                <Text style={styles.declineBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.acceptBtn, { backgroundColor: '#27AE60' }]}
-                disabled={loading}
-                onPress={() => { setShowOtpModal(false); handleComplete(); }}>
-                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.acceptBtnText}>Complete</Text>}
-              </TouchableOpacity>
+      {/* TRIP CONTROLS */}
+      <View style={styles.navCard}>
+         <View style={styles.stepper}>
+            <View style={styles.stepUnit}>
+               <View style={[styles.stepCircle, phase === 'PICKUP' ? styles.stepActive : styles.stepDone]}>
+                  <Icon name={phase === 'PICKUP' ? 'map-marker-radius' : 'check'} size={14} color={Colors.white} />
+               </View>
+               <Text style={[styles.stepLabel, phase === 'PICKUP' && styles.labelActive]}>Rescue</Text>
             </View>
-          </View>
-        </View>
-      </Modal>
+            <View style={[styles.stepConnector, phase === 'DROPOFF' && styles.connActive]} />
+            <View style={styles.stepUnit}>
+               <View style={[styles.stepCircle, phase === 'DROPOFF' && styles.stepActive]}>
+                  <Icon name="hospital-marker" size={14} color={Colors.white} />
+               </View>
+               <Text style={[styles.stepLabel, phase === 'DROPOFF' && styles.labelActive]}>Facility</Text>
+            </View>
+         </View>
 
-      <View style={styles.infoCard}>
-        <View style={styles.phase}>
-          <View style={[styles.phaseStep, phase === 'PICKUP' ? styles.phaseActive : styles.phaseDone]}>
-            <Icon name={phase === 'PICKUP' ? 'map-marker-distance' : 'check'} size={14} color="#fff" />
-          </View>
-          <Text style={[styles.phaseLabel, phase === 'PICKUP' && styles.activeText]}>Reach Patient</Text>
-          <View style={[styles.phaseLine, phase === 'DROPOFF' && styles.lineActive]} />
-          <View style={[styles.phaseStep, phase === 'DROPOFF' && styles.phaseActive]}>
-            <Icon name="hospital-building" size={14} color="#fff" />
-          </View>
-          <Text style={[styles.phaseLabel, phase === 'DROPOFF' && styles.activeText]}>To Hospital</Text>
-        </View>
+         <View style={styles.metaRow}>
+            <View style={styles.metaMain}>
+               <Text style={styles.metaTitle}>{phase === 'PICKUP' ? 'En Route to Patient' : 'En Route to Facility'}</Text>
+               <Text style={styles.metaSub} numberOfLines={1}>
+                  {phase === 'PICKUP' ? (emergency.location?.address || 'Geolocation Secured') : emergency.hospitalName}
+               </Text>
+            </View>
+            <TouchableOpacity style={styles.callCircle} onPress={() => emergency.userPhone && Linking.openURL(`tel:${emergency.userPhone}`)}>
+               <Icon name="phone" size={22} color={Colors.white} />
+            </TouchableOpacity>
+         </View>
 
-        <View style={styles.actionRow}>
-          <TouchableOpacity 
-            style={styles.actionBtn} 
+         <TouchableOpacity 
+            style={[styles.primaryAction, { backgroundColor: phase === 'PICKUP' ? Colors.info : Colors.success }]} 
             onPress={() => {
               if (phase === 'PICKUP') setPhase('DROPOFF');
               else setShowOtpModal(true);
             }}
-          >
-            <Text style={styles.actionBtnText}>
-              {phase === 'PICKUP' ? 'ARRIVED AT PATIENT' : 'ARRIVED AT HOSPITAL'}
+         >
+            <Text style={styles.primaryActionText}>
+              {phase === 'PICKUP' ? 'MARK ARRIVAL AT PATIENT' : 'MARK ARRIVAL AT HOSPITAL'}
             </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.callSmallBtn} 
-            onPress={() => emergency.userPhone && Linking.openURL(`tel:${emergency.userPhone}`)}
-          >
-            <Icon name="phone" size={24} color="#fff" />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.divider} />
-
-        {emergency.hospitalName && (
-          <View style={styles.row}><Icon name="hospital-building" size={16} color="#888" /><Text style={styles.rowText}>{emergency.hospitalName}</Text></View>
-        )}
-        {emergency.hospitalAddress && (
-          <View style={styles.row}><Icon name="map-marker" size={16} color="#888" /><Text style={styles.rowText}>{emergency.hospitalAddress}</Text></View>
-        )}
+         </TouchableOpacity>
       </View>
+
+      {/* OTP OVERLAY */}
+      <Modal transparent visible={showOtpModal} animationType="slide">
+        <View style={styles.overlay}>
+           <View style={styles.bottomSheet}>
+              <View style={styles.sheetHandle} />
+              <Text style={styles.sheetTitle}>Final Handover</Text>
+              <Text style={styles.sheetSub}>Input the verification code from the patient to finish.</Text>
+              
+              <TextInput
+                style={styles.sheetInput}
+                placeholder="----"
+                placeholderTextColor={Colors.border}
+                keyboardType="number-pad"
+                maxLength={4}
+                value={otpInput}
+                onChangeText={setOtpInput}
+                autoFocus
+              />
+
+              <View style={styles.sheetActions}>
+                 <TouchableOpacity style={styles.sheetSecondary} onPress={() => { setShowOtpModal(false); setOtpInput(''); }}>
+                    <Text style={styles.secText}>Cancel</Text>
+                 </TouchableOpacity>
+                 <TouchableOpacity style={styles.sheetPrimary} disabled={loading} onPress={() => { setShowOtpModal(false); handleComplete(); }}>
+                    {loading ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.priText}>CONFIRM COMPLETION</Text>}
+                 </TouchableOpacity>
+              </View>
+           </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#000' },
+  safe: { flex: 1, backgroundColor: Colors.white },
   map: { flex: 1 },
   backBtn: {
-    position: 'absolute', top: 56, left: 16, zIndex: 10,
-    width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.7)',
-    alignItems: 'center', justifyContent: 'center'
+    position: 'absolute', top: 50, left: 20, zIndex: 10,
+    width: 48, height: 48, borderRadius: 24, backgroundColor: Colors.white,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10, elevation: 5
   },
-  patientMarker: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F39C12', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
-  hospMarker: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#C0392B', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
-  infoCard: { backgroundColor: '#1A1A1A', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 32 },
-  phase: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 6 },
-  phaseStep: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#2A2A2A', alignItems: 'center', justifyContent: 'center' },
-  phaseActive: { backgroundColor: '#C0392B' },
-  phaseDone: { backgroundColor: '#27AE60' },
-  phaseStepText: { color: '#fff', fontWeight: '700', fontSize: 12 },
-  phaseLabel: { fontSize: 13, color: '#888', marginRight: 6 },
-  activeText: { color: '#fff', fontWeight: '600' },
-  phaseLine: { flex: 1, height: 2, backgroundColor: '#2A2A2A' },
-  lineActive: { backgroundColor: '#C0392B' },
-  actionRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 20,
+  
+  markerRing: { 
+    width: 40, height: 40, borderRadius: 20, borderWidth: 8, 
+    alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.white 
   },
-  actionBtn: {
-    flex: 1,
-    backgroundColor: '#C0392B',
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 20,
-    shadowColor: '#C0392B',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 6
+  markerCore: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  ambMarker: {
+    width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.white,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 8, elevation: 5
   },
-  actionBtnText: { color: '#fff', fontSize: 15, fontWeight: '700', letterSpacing: 1 },
-  callSmallBtn: {
-    width: 50,
-    backgroundColor: '#E67E22',
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 6
+  
+  navCard: { 
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: Colors.white, borderTopLeftRadius: 36, borderTopRightRadius: 36, 
+    padding: 24, paddingBottom: Platform.OS === 'ios' ? 44 : 24,
+    shadowColor: '#000', shadowOffset: { width: 0, height: -10 }, shadowOpacity: 0.05, shadowRadius: 15, elevation: 20
   },
-  divider: { height: 1, backgroundColor: '#2A2A2A', marginBottom: 20 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
-  rowText: { flex: 1, fontSize: 13, color: '#ccc' },
-  // Modal Styles
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center' },
-  otpModalCard: {
-    backgroundColor: '#1A1A1A', borderRadius: 24, padding: 24, width: '85%',
-    borderWidth: 1, borderColor: '#333', alignSelf: 'center'
+  
+  stepper: { flexDirection: 'row', alignItems: 'center', marginBottom: 24, paddingHorizontal: 20 },
+  stepUnit: { alignItems: 'center' },
+  stepCircle: { 
+    width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.grayLight, 
+    alignItems: 'center', justifyContent: 'center' 
   },
-  otpModalTitle: { fontSize: 20, fontWeight: '800', color: '#fff', textAlign: 'center', marginBottom: 8 },
-  otpModalSub: { fontSize: 13, color: '#888', textAlign: 'center', marginBottom: 24 },
-  otpInput: {
-    backgroundColor: '#0D0D0D', borderRadius: 12, height: 60,
-    fontSize: 28, fontWeight: '800', color: '#fff', textAlign: 'center',
-    letterSpacing: 10, marginBottom: 24, borderWidth: 1, borderColor: '#333'
+  stepActive: { backgroundColor: Colors.info },
+  stepDone: { backgroundColor: Colors.success },
+  stepLabel: { fontSize: 10, fontWeight: '800', color: Colors.textTertiary, marginTop: 4, textTransform: 'uppercase' },
+  labelActive: { color: Colors.textPrimary },
+  stepConnector: { flex: 1, height: 2, backgroundColor: Colors.grayLight, marginHorizontal: 8, marginTop: -14 },
+  connActive: { backgroundColor: Colors.info },
+
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 24 },
+  metaMain: { flex: 1 },
+  metaTitle: { fontSize: 18, fontWeight: '900', color: Colors.textPrimary },
+  metaSub: { fontSize: 13, color: Colors.textSecondary, fontWeight: '600', marginTop: 2 },
+  callCircle: { 
+    width: 52, height: 52, borderRadius: 26, backgroundColor: Colors.info, 
+    alignItems: 'center', justifyContent: 'center', elevation: 4 
   },
-  modalActions: { flexDirection: 'row', gap: 12 },
-  declineBtn: { flex: 1, backgroundColor: '#2A2A2A', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
-  declineBtnText: { color: '#888', fontWeight: '700', fontSize: 16 },
-  acceptBtn: { flex: 2, backgroundColor: '#C0392B', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
-  acceptBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+
+  primaryAction: { 
+    paddingVertical: 18, borderRadius: 20, alignItems: 'center',
+    shadowOpacity: 0.2, shadowRadius: 8, elevation: 5
+  },
+  primaryActionText: { color: Colors.white, fontSize: 13, fontWeight: '900', letterSpacing: 0.5 },
+
+  // MODAL
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  bottomSheet: { 
+    backgroundColor: Colors.white, borderTopLeftRadius: 36, borderTopRightRadius: 36, 
+    padding: 32, paddingBottom: 40 
+  },
+  sheetHandle: { width: 40, height: 4, backgroundColor: Colors.grayLight, borderRadius: 2, alignSelf: 'center', marginBottom: 24 },
+  sheetTitle: { fontSize: 24, fontWeight: '900', color: Colors.textPrimary, textAlign: 'center' },
+  sheetSub: { fontSize: 14, color: Colors.textSecondary, fontWeight: '600', textAlign: 'center', marginTop: 10, marginBottom: 32 },
+  sheetInput: {
+    backgroundColor: Colors.grayLight, borderRadius: 20, height: 72, 
+    fontSize: 32, fontWeight: '900', color: Colors.textPrimary, textAlign: 'center',
+    letterSpacing: 20, marginBottom: 32
+  },
+  sheetActions: { flexDirection: 'row', gap: 16 },
+  sheetSecondary: { flex: 1, paddingVertical: 16, alignItems: 'center' },
+  secText: { fontSize: 15, fontWeight: '800', color: Colors.textTertiary },
+  sheetPrimary: { flex: 2, backgroundColor: Colors.success, paddingVertical: 16, borderRadius: 16, alignItems: 'center' },
+  priText: { fontSize: 15, fontWeight: '900', color: Colors.white }
 });
+

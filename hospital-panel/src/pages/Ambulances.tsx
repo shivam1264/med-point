@@ -133,7 +133,7 @@ export default function Ambulances() {
                   <td><strong>{a.driverName}</strong><br /><small>{a.driverPhone}</small></td>
                   <td>{a.vehicleNumber}</td>
                   <td>{a.vehicleType}</td>
-                  <td><span className={`badge ${a.isOnline ? 'badge-green' : 'badge-gray'}`}>{a.isOnline ? '🟢 Online' : '⚫ Offline'}</span></td>
+                  <td><span className={`badge ${a.isOnline ? 'badge-green' : 'badge-gray'}`}>{a.isOnline ? 'Online' : 'Offline'}</span></td>
                   <td><span className={`badge ${a.isAvailable ? 'badge-blue' : 'badge-amber'}`}>{a.isAvailable ? 'Free' : 'Busy'}</span></td>
                   <td><button className="btn-sm btn-danger" onClick={() => del(a._id)}>Remove</button></td>
                 </tr>

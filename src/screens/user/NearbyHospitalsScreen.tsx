@@ -9,12 +9,13 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Geolocation from '@react-native-community/geolocation';
 import hospitalService from '../../services/hospitalService';
 import sosService from '../../services/sosService';
+import { Colors } from '../../constants/colors';
 import type { Hospital } from '../../types';
 
 const statusConfig = {
-  green: { label: 'Available', color: '#27AE60', bg: '#0D2818' },
-  amber: { label: 'Moderate', color: '#F39C12', bg: '#2A1A00' },
-  red:   { label: 'Critical', color: '#C0392B', bg: '#2A0A0A' },
+  green: { label: 'Available', color: Colors.success, bg: Colors.successLight },
+  amber: { label: 'Busy', color: Colors.warning, bg: Colors.warningLight },
+  red:   { label: 'Full', color: Colors.danger, bg: Colors.dangerLight },
 };
 
 export function NearbyHospitalsScreen({ navigation }: any) {
@@ -30,15 +31,13 @@ export function NearbyHospitalsScreen({ navigation }: any) {
 
   useFocusEffect(
     useCallback(() => {
-      // Get params from the current route
       const state = navigation.getState();
       const currentRoute = state?.routes?.find((r: any) => r.name === 'Hospitals');
       const params = currentRoute?.params as any;
       
       if (params?.isEmergency) {
         setIsSOSMode(true);
-        setShowSOSOverlay(true); // Show floating window
-        // Clear param so next visit is normal
+        setShowSOSOverlay(true);
         navigation.setParams({ isEmergency: undefined });
         fetchLocation(true);
       } else {
@@ -55,7 +54,7 @@ export function NearbyHospitalsScreen({ navigation }: any) {
         PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
         {
           title: 'Location Permission',
-          message: 'MedFlow needs location access to find nearby hospitals and dispatch ambulances.',
+          message: 'MedFlow needs location access to find nearby hospitals.',
           buttonPositive: 'OK',
         },
       );
@@ -70,19 +69,14 @@ export function NearbyHospitalsScreen({ navigation }: any) {
     Geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
-        console.log(`Location found: ${latitude}, ${longitude}`);
         setUserLat(latitude);
         setUserLng(longitude);
         fetchHospitals(latitude, longitude, useSOS);
       },
       (error) => {
-        console.log('Location Error:', error);
-        // Error code 2 is POSITION_UNAVAILABLE (GPS off)
-        // Error code 3 is TIMEOUT
         if (error.code === 2) {
-          Alert.alert('GPS Disabled', 'Please turn on your GPS from the notification panel.');
+          Alert.alert('GPS Disabled', 'Please turn on your GPS.');
         } else if (error.code === 3) {
-          // Retry with lower accuracy if high accuracy timed out
           fetchLocationLazy(useSOS);
           return;
         }
@@ -113,13 +107,10 @@ export function NearbyHospitalsScreen({ navigation }: any) {
 
   const fetchHospitals = async (lat: number, lng: number, useSOS: boolean) => {
     try {
-      // Fetch hospitals
-      const data = await hospitalService.getNearbyHospitals(lat, lng, 50, useSOS);
-      console.log(`🏥 Total Hospitals Found: ${data.length} (Requested 50)`);
-      
+      const data = await hospitalService.getNearbyHospitals(lat, lng, 30, useSOS);
       setHospitals(data);
     } catch (err: any) {
-      Alert.alert('Error', 'Failed to load hospitals. Make sure backend is running.');
+      Alert.alert('Error', 'Failed to load hospitals.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -130,17 +121,11 @@ export function NearbyHospitalsScreen({ navigation }: any) {
     setLoading(true);
     try {
       if (!userLat || !userLng) throw new Error('Location not found');
-      const result = await sosService.triggerSOS(userLat, userLng, hospital._id);
-      
-      Alert.alert(
-        '🚑 Request Sent!',
-        `Your request has been sent to ${hospital.hospitalName}. We are notifying nearby drivers.\n\nYou will be able to track once a driver accepts.`,
-        [{ text: 'OK' }]
-      );
+      await sosService.triggerSOS(userLat, userLng, hospital._id);
+      Alert.alert('🚑 SOS Active!', `Booking request sent to ${hospital.hospitalName}. Help is on the way.`);
     } catch (err: any) {
-      console.log('SOS Failure', err?.response?.data || err);
-      const msg = err?.response?.data?.message || err.message || 'Ambulance booking failed. Try another hospital.';
-      Alert.alert('Booking Failed', `Error: ${msg}`);
+      const msg = err?.response?.data?.message || 'Booking failed.';
+      Alert.alert('Error', msg);
     } finally {
       setLoading(false);
     }
@@ -155,56 +140,50 @@ export function NearbyHospitalsScreen({ navigation }: any) {
     navigation.navigate('UserMap', { hospital, userLat, userLng });
   };
 
-  const renderHospital = ({ item, index }: { item: Hospital; index: number }) => {
+  const renderHospital = ({ item }: { item: Hospital }) => {
     const cfg = statusConfig[item.status] || statusConfig.green;
     const dist = item.distanceKm?.toFixed(1);
-    const eta = item.distanceKm ? Math.round(item.distanceKm * 3) : null;
+    const eta = item.distanceKm ? Math.round(item.distanceKm * 4) : '--';
 
     return (
-      <View style={styles.card}>
+      <View style={styles.hospitalCard}>
         <View style={styles.cardHeader}>
-          <View style={styles.cardInfo}>
+          <View style={styles.titleArea}>
             <Text style={styles.hospitalName} numberOfLines={1}>{item.hospitalName}</Text>
-            <Text style={styles.hospitalArea} numberOfLines={1}>{item.area || item.address}</Text>
+            <Text style={styles.hospitalAddress} numberOfLines={1}>{item.area || item.address}</Text>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: cfg.bg }]}>
             <Text style={[styles.statusText, { color: cfg.color }]}>{cfg.label}</Text>
           </View>
         </View>
 
-        {/* Distance + ETA */}
         <View style={styles.metaRow}>
-          {dist && (
-            <View style={styles.metaItem}>
-              <Icon name="map-marker-distance" size={14} color="#888" />
-              <Text style={styles.metaText}>{dist} km away</Text>
-            </View>
-          )}
-          {eta && (
-            <View style={styles.metaItem}>
-              <Icon name="clock-outline" size={14} color="#888" />
-              <Text style={styles.metaText}>~{eta} min</Text>
-            </View>
-          )}
+          <View style={styles.metaTag}>
+             <Icon name="map-marker-path" size={14} color={Colors.info} />
+             <Text style={styles.metaTagText}>{dist} km away</Text>
+          </View>
+          <View style={styles.metaTag}>
+             <Icon name="clock-outline" size={14} color={Colors.info} />
+             <Text style={styles.metaTagText}>{eta} min • ETA</Text>
+          </View>
+          <View style={styles.metaTag}>
+             <Icon name="bed-outline" size={14} color={Colors.info} />
+             <Text style={styles.metaTagText}>{item.availableBeds} beds</Text>
+          </View>
         </View>
 
-        {/* Actions */}
-        <View style={styles.actions}>
-          <TouchableOpacity style={styles.bookBtn} onPress={() => handleBookAmbulance(item)}>
-            <Icon name="ambulance" size={16} color="#fff" />
-            <Text style={styles.navBtnText}>Book Ambulance</Text>
+        <View style={styles.actionRow}>
+          <TouchableOpacity style={styles.mainAction} onPress={() => handleBookAmbulance(item)}>
+            <Icon name="ambulance" size={18} color={Colors.white} />
+            <Text style={styles.mainActionText}>Call Ambulance</Text>
           </TouchableOpacity>
           
-          <View style={styles.secondaryActions}>
-            <TouchableOpacity 
-              style={styles.iconBtn} 
-              onPress={() => item.phone && Linking.openURL(`tel:${item.phone}`)}
-            >
-              <Icon name="phone" size={18} color="#C0392B" />
+          <View style={styles.sideActions}>
+            <TouchableOpacity style={styles.sideBtn} onPress={() => item.phone && Linking.openURL(`tel:${item.phone}`)}>
+               <Icon name="phone" size={20} color={Colors.info} />
             </TouchableOpacity>
-
-            <TouchableOpacity style={styles.iconBtn} onPress={() => handleNavigate(item)}>
-              <Icon name="navigation" size={18} color="#fff" />
+            <TouchableOpacity style={[styles.sideBtn, { backgroundColor: Colors.info }]} onPress={() => handleNavigate(item)}>
+               <Icon name="directions" size={20} color={Colors.white} />
             </TouchableOpacity>
           </View>
         </View>
@@ -214,242 +193,197 @@ export function NearbyHospitalsScreen({ navigation }: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color="#C0392B" />
-          <Text style={styles.loadingText}>Finding nearby hospitals...</Text>
-        </View>
-      </SafeAreaView>
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={Colors.danger} />
+        <Text style={styles.loadingInfo}>Scanning medical facilities...</Text>
+      </View>
     );
   }
 
   if (locationError) {
     return (
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.center}>
-          <Icon name="map-marker-off" size={48} color="#C0392B" />
-          <Text style={styles.errorTitle}>Location Access Required</Text>
-          <Text style={styles.errorSub}>Please enable GPS permission</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={() => { setLocationError(false); setLoading(true); fetchLocation(); }}>
-            <Text style={styles.retryText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+      <View style={styles.centered}>
+        <Icon name="crosshairs-gps" size={60} color={Colors.gray} />
+        <Text style={styles.errorTitle}>Location Required</Text>
+        <Text style={styles.errorText}>Please enable GPS to find help.</Text>
+        <TouchableOpacity style={styles.retryAction} onPress={() => { setLocationError(false); setLoading(true); fetchLocation(); }}>
+          <Text style={styles.retryText}>Grant Access</Text>
+        </TouchableOpacity>
+      </View>
     );
   }
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor="#0D0D0D" />
-      <View style={styles.headerBar}>
-        <Text style={styles.title}>All Hospitals Nearby</Text>
-        <Text style={styles.subtitle}>Showing all hospitals sorted by distance</Text>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
+      
+      <View style={styles.topBar}>
+        <View>
+          <Text style={styles.headerTitle}>Medical Centers</Text>
+          <Text style={styles.headerSub}>Finding best care nearby</Text>
+        </View>
+        <TouchableOpacity style={styles.filterBtn}>
+           <Icon name="tune" size={22} color={Colors.textPrimary} />
+        </TouchableOpacity>
       </View>
+
       <FlatList
         data={hospitals}
         keyExtractor={(item) => item._id}
-        renderItem={({ item, index }) => renderHospital({ item, index })}
-        contentContainerStyle={styles.list}
+        renderItem={renderHospital}
+        contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#C0392B" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.danger} />}
         ListEmptyComponent={
-          <View style={styles.center}>
-            <Icon name="hospital" size={48} color="#444" />
-            <Text style={styles.emptyText}>No hospitals found nearby</Text>
+          <View style={styles.emptyContainer}>
+            <Icon name="hospital-marker" size={50} color={Colors.grayLight} />
+            <Text style={styles.emptyText}>No facilities found nearby.</Text>
           </View>
         }
       />
 
-      {/* Floating SOS Overlay */}
+      {/* Floating Recommendation Overlay */}
       <Modal
         visible={showSOSOverlay}
         transparent={true}
         animationType="slide"
         onRequestClose={() => setShowSOSOverlay(false)}
       >
-        <TouchableOpacity 
-          style={styles.modalOverlay} 
-          activeOpacity={1} 
-          onPress={() => setShowSOSOverlay(false)}
-        >
-          <View style={styles.floatingWindow}>
-            <View style={styles.floatingHeader}>
-              <View style={styles.floatingTitleWrapper}>
-                <Icon name="star" size={20} color="#F39C12" />
-                <Text style={styles.floatingTitle}>AI Top Recommended</Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowSOSOverlay(false)} style={styles.closeBtn}>
-                <Icon name="close" size={24} color="#888" />
-              </TouchableOpacity>
+        <View style={styles.modalBackdrop}>
+          <TouchableOpacity style={styles.modalDismiss} onPress={() => setShowSOSOverlay(false)} />
+          <View style={styles.recommendationSheet}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.sheetHeader}>
+               <View>
+                 <Text style={styles.sheetTitle}>Best Emergency Care</Text>
+                 <Text style={styles.sheetSub}>Optimized for response time & bed availability</Text>
+               </View>
+               <TouchableOpacity onPress={() => setShowSOSOverlay(false)} style={styles.closeSheet}>
+                  <Icon name="close" size={24} color={Colors.textTertiary} />
+               </TouchableOpacity>
             </View>
-            
-            <Text style={styles.floatingSub}>Fastest response & high bed availability</Text>
 
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.floatingList}>
-              {hospitals.slice(0, 5).map((h, i) => (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sheetTiles}>
+              {hospitals.slice(0, 5).map((h) => (
                 <TouchableOpacity 
-                  key={h._id} 
-                  style={styles.floatingCard}
-                  onPress={() => {
-                    setShowSOSOverlay(false);
-                    handleBookAmbulance(h);
-                  }}
+                   key={h._id} 
+                   style={styles.hospitalTile}
+                   onPress={() => {
+                     setShowSOSOverlay(false);
+                     handleBookAmbulance(h);
+                   }}
                 >
-                  <View style={styles.floatingCardHeader}>
-                    <Text style={styles.floatingCardName} numberOfLines={1}>{h.hospitalName}</Text>
-                    <View style={styles.statusDotLine}>
-                      <View style={[styles.statusDot, { backgroundColor: statusConfig[h.status]?.color || '#27AE60' }]} />
+                  <View style={styles.tileMain}>
+                    <Text style={styles.tileName} numberOfLines={1}>{h.hospitalName}</Text>
+                    <View style={styles.tileMetaRow}>
+                       <Text style={styles.tileDist}>{h.distanceKm?.toFixed(1)} km</Text>
+                       <View style={styles.tileDot} />
+                       <Text style={styles.tileEta}>{Math.round(h.distanceKm! * 4)} min</Text>
                     </View>
                   </View>
-                  <Text style={styles.floatingCardDist}>{h.distanceKm?.toFixed(1)} km · {Math.round(h.distanceKm! * 3)} min</Text>
-                  <View style={styles.floatingCardBeds}>
-                    <Icon name="bed-outline" size={14} color="#aaa" />
-                    <Text style={styles.floatingBedText}>{h.availableBeds} Free</Text>
-                  </View>
-                  <View style={styles.sosGoBtn}>
-                    <Text style={styles.sosGoText}>BOOK NOW</Text>
+                  <View style={styles.tileFooter}>
+                     <View style={[styles.tileStatusIndicator, { backgroundColor: statusConfig[h.status]?.color || Colors.success }]} />
+                     <Text style={styles.tileBedText}>{h.availableBeds} beds</Text>
+                     <View style={styles.tileAction}>
+                        <Text style={styles.tileActionText}>SELECT</Text>
+                     </View>
                   </View>
                 </TouchableOpacity>
               ))}
             </ScrollView>
-            
-            <TouchableOpacity style={styles.seeFullBtn} onPress={() => setShowSOSOverlay(false)}>
-              <Text style={styles.seeFullText}>View All Hospitals</Text>
+
+            <TouchableOpacity style={styles.viewFullAction} onPress={() => setShowSOSOverlay(false)}>
+               <Text style={styles.viewFullText}>Explore other facilities</Text>
             </TouchableOpacity>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#0D0D0D' },
-  headerBar: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 },
-  title: { fontSize: 24, fontWeight: '800', color: '#fff' },
-  subtitle: { fontSize: 13, color: '#888', marginTop: 4 },
-  list: { paddingBottom: 32 },
-  sectionHeader: { 
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 16, paddingTop: 28, paddingBottom: 14, backgroundColor: '#0D0D0D' 
+  safe: { flex: 1, backgroundColor: Colors.white },
+  centered: { flex: 1, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center', padding: 30 },
+  topBar: { 
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 24, paddingTop: 16, paddingBottom: 16
   },
-  recommendedHeader: { borderBottomWidth: 0 },
-  othersHeader: { borderTopWidth: 1, borderTopColor: '#222', marginTop: 10 },
-  sectionTitle: { fontSize: 13, fontWeight: '800', color: '#888', letterSpacing: 1.5, textTransform: 'uppercase' },
-  aiBadge: { 
-    position: 'absolute', top: -10, right: 16, zIndex: 10,
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: '#C0392B', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,
-    shadowColor: '#C0392B', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 6, elevation: 8
-  },
-  aiBadgeText: { fontSize: 9, fontWeight: '900', color: '#fff', letterSpacing: 0.5 },
-  card: {
-    backgroundColor: '#1A1A1A', borderRadius: 16, marginHorizontal: 16,
-    padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#2A2A2A'
-  },
-  recommendedCard: {
-    borderColor: '#C0392B66', borderWidth: 1.5, backgroundColor: '#1E1414',
-    shadowColor: '#C0392B', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 10, elevation: 4
-  },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  rankBadge: {
-    width: 32, height: 32, borderRadius: 10,
-    backgroundColor: '#333', alignItems: 'center', justifyContent: 'center', marginRight: 10
-  },
-  recommendedRankBadge: { backgroundColor: '#C0392B20' },
-  rankText: { fontSize: 13, fontWeight: '700', color: '#C0392B' },
-  cardInfo: { flex: 1 },
-  hospitalName: { fontSize: 15, fontWeight: '700', color: '#fff' },
-  hospitalArea: { fontSize: 12, color: '#888', marginTop: 2 },
-  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  statusText: { fontSize: 11, fontWeight: '700' },
-  metaRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
-  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  metaText: { fontSize: 12, color: '#888' },
-  bedsRow: {
-    flexDirection: 'row', backgroundColor: '#0D0D0D',
-    borderRadius: 10, padding: 12, marginBottom: 10
-  },
-  bedItem: { flex: 1, alignItems: 'center' },
-  bedNum: { fontSize: 20, fontWeight: '800', color: '#fff' },
-  bedLabel: { fontSize: 10, color: '#888', marginTop: 2 },
-  bedTotal: { fontSize: 10, color: '#555' },
-  bedDivider: { width: 1, backgroundColor: '#2A2A2A', marginHorizontal: 4 },
-  specRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
-  specChip: {
-    backgroundColor: '#2A2A2A', borderRadius: 6,
-    paddingHorizontal: 8, paddingVertical: 3
-  },
-  specText: { fontSize: 11, color: '#aaa' },
-  specMore: { fontSize: 11, color: '#888', alignSelf: 'center' },
-  actions: { flexDirection: 'row', gap: 10 },
-  callBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, borderWidth: 1, borderColor: '#C0392B', borderRadius: 10, paddingVertical: 10
-  },
-  callBtnText: { color: '#C0392B', fontWeight: '600', fontSize: 14 },
-  emergencyHeader: { backgroundColor: '#2A0A0A', paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#C0392B' },
-  bookBtn: {
-    flex: 3, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, backgroundColor: '#27AE60', borderRadius: 10, paddingVertical: 10
-  },
-  secondaryActions: {
-    flex: 2,
-    flexDirection: 'row',
-    gap: 8,
-  },
-  iconBtn: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#1A1A1A',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#333',
-    paddingVertical: 10,
-  },
-  navBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, backgroundColor: '#C0392B', borderRadius: 10, paddingVertical: 10
-  },
-  navBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: 12 },
-  loadingText: { color: '#888', fontSize: 14, marginTop: 12 },
-  errorTitle: { fontSize: 18, fontWeight: '700', color: '#fff' },
-  errorSub: { fontSize: 13, color: '#888' },
-  retryBtn: { backgroundColor: '#C0392B', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10, marginTop: 8 },
-  retryText: { color: '#fff', fontWeight: '700' },
-  emptyText: { color: '#888', fontSize: 14 },
+  headerTitle: { fontSize: 26, fontWeight: '900', color: Colors.textPrimary, letterSpacing: -0.5 },
+  headerSub: { fontSize: 13, color: Colors.textSecondary, fontWeight: '600' },
+  filterBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center' },
 
-  // Floating Window Styles
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
-  floatingWindow: {
-    backgroundColor: '#111',
-    borderTopLeftRadius: 32, borderTopRightRadius: 32,
-    padding: 20, paddingTop: 10,
-    borderWidth: 1, borderColor: '#C0392B44',
+  listContainer: { padding: 20 },
+  hospitalCard: {
+    backgroundColor: Colors.white, borderRadius: 24, padding: 20, marginBottom: 20,
+    borderWidth: 1.5, borderColor: Colors.grayLight,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.04, shadowRadius: 10, elevation: 2
   },
-  floatingHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  floatingTitleWrapper: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  floatingTitle: { fontSize: 20, fontWeight: '800', color: '#fff' },
-  floatingSub: { fontSize: 13, color: '#888', marginBottom: 20, marginLeft: 28 },
-  closeBtn: { padding: 8 },
-  floatingList: { paddingBottom: 10, gap: 15 },
-  floatingCard: {
-    width: 200, backgroundColor: '#1E1414', borderRadius: 20,
-    padding: 16, borderWidth: 1, borderColor: '#C0392B33',
-    elevation: 4
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
+  titleArea: { flex: 1, marginRight: 10 },
+  hospitalName: { fontSize: 18, fontWeight: '800', color: Colors.textPrimary },
+  hospitalAddress: { fontSize: 13, color: Colors.textSecondary, marginTop: 2, fontWeight: '600' },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10 },
+  statusText: { fontSize: 11, fontWeight: '900', textTransform: 'uppercase' },
+
+  metaRow: { flexDirection: 'row', gap: 12, marginBottom: 20 },
+  metaTag: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.infoLight, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10 },
+  metaTagText: { fontSize: 12, color: Colors.info, fontWeight: '700' },
+
+  actionRow: { flexDirection: 'row', gap: 12 },
+  mainAction: { 
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', 
+    backgroundColor: Colors.success, borderRadius: 16, paddingVertical: 14, gap: 8 
   },
-  floatingCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 },
-  floatingCardName: { fontSize: 15, fontWeight: '700', color: '#fff', flex: 1 },
-  floatingCardDist: { fontSize: 12, color: '#aaa', marginBottom: 12 },
-  floatingCardBeds: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 },
-  floatingBedText: { fontSize: 12, color: '#888' },
-  sosGoBtn: { backgroundColor: '#C0392B', paddingVertical: 8, borderRadius: 10, alignItems: 'center' },
-  sosGoText: { fontSize: 11, fontWeight: '800', color: '#fff', letterSpacing: 0.5 },
-  seeFullBtn: { marginTop: 15, paddingVertical: 12, alignItems: 'center' },
-  seeFullText: { color: '#666', fontSize: 13, fontWeight: '600', textDecorationLine: 'underline' },
-  statusDotLine: { marginLeft: 8 },
-  emptyOthers: { paddingVertical: 20, alignItems: 'center' },
-  emptyOthersText: { color: '#444', fontSize: 12, fontStyle: 'italic' },
+  mainActionText: { color: Colors.white, fontWeight: '800', fontSize: 15 },
+  sideActions: { flexDirection: 'row', gap: 10 },
+  sideBtn: { 
+    width: 48, height: 48, borderRadius: 16, backgroundColor: Colors.grayLight, 
+    alignItems: 'center', justifyContent: 'center' 
+  },
+
+  loadingInfo: { marginTop: 16, fontSize: 13, color: Colors.textTertiary, fontWeight: '600' },
+  errorTitle: { fontSize: 20, fontWeight: '900', color: Colors.textPrimary, marginTop: 20 },
+  errorText: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center', marginTop: 8, fontWeight: '600' },
+  retryAction: { backgroundColor: Colors.info, paddingHorizontal: 30, paddingVertical: 14, borderRadius: 16, marginTop: 24 },
+  retryText: { color: Colors.white, fontWeight: '800' },
+  emptyContainer: { alignItems: 'center', marginTop: 60, gap: 12 },
+  emptyText: { color: Colors.textTertiary, fontSize: 14, fontWeight: '600' },
+
+  // Recommendation Sheet
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  modalDismiss: { flex: 1 },
+  recommendationSheet: {
+    backgroundColor: Colors.white, borderTopLeftRadius: 36, borderTopRightRadius: 36,
+    padding: 24, paddingBottom: Platform.OS === 'ios' ? 44 : 24,
+    shadowColor: '#000', shadowOffset: { width: 0, height: -10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 20
+  },
+  sheetHandle: { width: 40, height: 5, backgroundColor: Colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: 20 },
+  sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 },
+  sheetTitle: { fontSize: 24, fontWeight: '900', color: Colors.textPrimary, letterSpacing: -0.5 },
+  sheetSub: { fontSize: 13, color: Colors.textSecondary, fontWeight: '600', width: '85%', marginTop: 2 },
+  closeSheet: { padding: 4 },
+
+  sheetTiles: { gap: 16, paddingBottom: 10 },
+  hospitalTile: {
+    width: 240, backgroundColor: Colors.white, borderRadius: 28, padding: 20,
+    borderWidth: 2, borderColor: Colors.dangerLight,
+    shadowColor: Colors.danger, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 4
+  },
+  tileMain: { marginBottom: 20 },
+  tileName: { fontSize: 17, fontWeight: '800', color: Colors.textPrimary },
+  tileMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+  tileDist: { fontSize: 13, color: Colors.textTertiary, fontWeight: '700' },
+  tileDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: Colors.border },
+  tileEta: { fontSize: 13, color: Colors.danger, fontWeight: '800' },
+  
+  tileFooter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  tileStatusIndicator: { width: 8, height: 8, borderRadius: 4 },
+  tileBedText: { fontSize: 13, fontWeight: '700', color: Colors.textSecondary, flex: 1 },
+  tileAction: { backgroundColor: Colors.danger, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12 },
+  tileActionText: { color: Colors.white, fontSize: 11, fontWeight: '900' },
+
+  viewFullAction: { marginTop: 20, paddingVertical: 12, alignItems: 'center' },
+  viewFullText: { fontSize: 14, color: Colors.textTertiary, fontWeight: '700', textDecorationLine: 'underline' }
 });
+

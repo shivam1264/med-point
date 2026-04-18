@@ -50,13 +50,20 @@ export function AlertCard({
 
 const styles = StyleSheet.create({
   card: {
-    borderLeftWidth: 4,
-    borderRadius: 12,
-    borderWidth: 0.5,
-    borderColor: Colors.border,
-    padding: 12,
-    marginBottom: 8,
+    borderLeftWidth: 6,
+    borderRadius: 16,
+    backgroundColor: Colors.white,
+    borderWidth: 1.5,
+    borderColor: Colors.grayLight,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.02,
+    shadowRadius: 10,
+    elevation: 2,
   },
-  message: { ...Typography.body },
-  time: { ...Typography.tiny, marginTop: 4 },
+  message: { fontSize: 14, fontWeight: '700', color: Colors.textSecondary },
+  time: { fontSize: 11, fontWeight: '800', color: Colors.textTertiary, marginTop: 6, textTransform: 'uppercase' },
 });
+

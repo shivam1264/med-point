@@ -18,34 +18,35 @@ export function DispatcherTabs() {
         name="Home"
         component={DispatcherHomeScreen}
         options={{
-          tabBarLabel: Labels.home,
-          tabBarIcon: ({ color, size }) => <Icon name="home" size={size} color={color} />,
+          tabBarLabel: 'Fleet',
+          tabBarIcon: ({ color, size }) => <Icon name="shield-car" size={size + 2} color={color} />,
         }}
       />
       <Tab.Screen
         name="Map"
         component={HospitalMapScreen}
         options={{
-          tabBarLabel: Labels.map,
-          tabBarIcon: ({ color, size }) => <Icon name="map-marker" size={size} color={color} />,
+          tabBarLabel: 'Radar',
+          tabBarIcon: ({ color, size }) => <Icon name="map-marker-radius" size={size + 2} color={color} />,
         }}
       />
       <Tab.Screen
         name="Cases"
         component={CaseListScreen}
         options={{
-          tabBarLabel: Labels.cases,
-          tabBarIcon: ({ color, size }) => <Icon name="clipboard-list" size={size} color={color} />,
+          tabBarLabel: 'Logs',
+          tabBarIcon: ({ color, size }) => <Icon name="clipboard-pulse-outline" size={size + 2} color={color} />,
         }}
       />
       <Tab.Screen
         name="Settings"
         component={SettingsScreen}
         options={{
-          tabBarLabel: Labels.settings,
-          tabBarIcon: ({ color, size }) => <Icon name="cog" size={size} color={color} />,
+          tabBarLabel: 'Settings',
+          tabBarIcon: ({ color, size }) => <Icon name="cog-outline" size={size + 2} color={color} />,
         }}
       />
     </Tab.Navigator>
+
   );
 }

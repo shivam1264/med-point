@@ -1,19 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  TextInput, ActivityIndicator, StatusBar
+  TextInput, ActivityIndicator, StatusBar, Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import doctorService from '../../services/doctorService';
+import { Colors } from '../../constants/colors';
+import { Typography } from '../../constants/typography';
 import type { Doctor } from '../../types';
 
 const specialties = ['All', 'Cardiology', 'Neurology', 'Orthopedics', 'Pediatrics', 'Oncology', 'Gynecology', 'General Surgery'];
 
 const statusConfig = {
-  'available': { icon: 'check-circle', color: '#27AE60', label: 'Available' },
-  'busy':      { icon: 'clock-alert', color: '#F39C12', label: 'Busy' },
-  'off-duty':  { icon: 'minus-circle', color: '#888', label: 'Off Duty' },
+  'available': { icon: 'check-circle', color: Colors.success, label: 'Available' },
+  'busy':      { icon: 'clock-alert', color: Colors.warning, label: 'On Call' },
+  'off-duty':  { icon: 'minus-circle', color: Colors.textTertiary, label: 'Offline' },
 };
 
 export function DoctorScreen() {
@@ -52,76 +54,80 @@ export function DoctorScreen() {
   };
 
   const renderDoctor = ({ item }: { item: Doctor }) => {
-    const status = statusConfig[item.availableStatus] || statusConfig['off-duty'];
+    const status = statusConfig[item.availableStatus as keyof typeof statusConfig] || statusConfig['off-duty'];
     return (
-      <View style={styles.card}>
+      <TouchableOpacity style={styles.card} activeOpacity={0.7}>
         <View style={styles.cardLeft}>
-          <View style={styles.avatar}>
-            <Icon name="doctor" size={28} color="#C0392B" />
+          <View style={[styles.avatar, { backgroundColor: Colors.info + '10' }]}>
+            <Icon name="doctor" size={32} color={Colors.info} />
           </View>
+          <View style={[styles.statusIndicator, { backgroundColor: status.color }]} />
         </View>
         <View style={styles.cardBody}>
           <View style={styles.cardTop}>
             <Text style={styles.docName}>{item.name}</Text>
-            <View style={[styles.statusBadge, { backgroundColor: status.color + '20' }]}>
-              <Icon name={status.icon} size={12} color={status.color} />
+            <View style={[styles.statusBadge, { backgroundColor: status.color + '10' }]}>
               <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
             </View>
           </View>
           <Text style={styles.specialty}>{item.specialty}</Text>
-          {item.hospitalName && (
-            <View style={styles.infoRow}>
-              <Icon name="hospital-building" size={13} color="#888" />
-              <Text style={styles.infoText}>{item.hospitalName}</Text>
+          
+          <View style={styles.infoGrid}>
+            {item.hospitalName && (
+              <View style={styles.infoRow}>
+                <Icon name="hospital-building" size={14} color={Colors.textTertiary} />
+                <Text style={styles.infoText} numberOfLines={1}>{item.hospitalName}</Text>
+              </View>
+            )}
+            <View style={styles.metaRow}>
+              {item.experience !== undefined && (
+                <View style={styles.metaItem}>
+                  <Icon name="briefcase-outline" size={13} color={Colors.textTertiary} />
+                  <Text style={styles.metaText}>{item.experience}y Exp</Text>
+                </View>
+              )}
+              {item.consultationFee !== undefined && item.consultationFee > 0 && (
+                <Text style={styles.fee}>₹{item.consultationFee}</Text>
+              )}
             </View>
-          )}
-          <View style={styles.metaRow}>
-            {item.experience !== undefined && (
-              <View style={styles.metaItem}>
-                <Icon name="briefcase-outline" size={12} color="#666" />
-                <Text style={styles.metaText}>{item.experience} yrs exp</Text>
-              </View>
-            )}
-            {item.qualification && (
-              <View style={styles.metaItem}>
-                <Icon name="school" size={12} color="#666" />
-                <Text style={styles.metaText}>{item.qualification}</Text>
-              </View>
-            )}
           </View>
-          {item.consultationFee !== undefined && item.consultationFee > 0 && (
-            <Text style={styles.fee}>₹{item.consultationFee} consultation</Text>
-          )}
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor="#0D0D0D" />
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
 
       {/* Header */}
       <View style={styles.headerBar}>
-        <Text style={styles.title}>Doctors</Text>
-        <Text style={styles.subtitle}>Find specialists near you</Text>
+        <View>
+          <Text style={styles.title}>Specialists</Text>
+          <Text style={styles.subtitle}>Find expert medical care</Text>
+        </View>
+        <TouchableOpacity style={styles.filterBtn}>
+           <Icon name="tune-vertical" size={22} color={Colors.textPrimary} />
+        </TouchableOpacity>
       </View>
 
       {/* Search */}
-      <View style={styles.searchWrap}>
-        <Icon name="magnify" size={20} color="#666" style={{ marginRight: 8 }} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search by name, specialty..."
-          placeholderTextColor="#555"
-          value={search}
-          onChangeText={setSearch}
-        />
-        {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch('')}>
-            <Icon name="close" size={20} color="#666" />
-          </TouchableOpacity>
-        )}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchWrap}>
+          <Icon name="magnify" size={22} color={Colors.textTertiary} style={{ marginRight: 10 }} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search name, clinic or specialty..."
+            placeholderTextColor={Colors.textTertiary}
+            value={search}
+            onChangeText={setSearch}
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => setSearch('')}>
+              <Icon name="close-circle" size={18} color={Colors.textTertiary} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Specialty chips */}
@@ -132,7 +138,6 @@ export function DoctorScreen() {
           keyExtractor={(item) => item}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chips}
-          ItemSeparatorComponent={() => <View style={{ width: 10 }} />}
           renderItem={({ item }) => (
             <TouchableOpacity
               style={[styles.chip, selectedSpec === item && styles.chipActive]}
@@ -145,8 +150,8 @@ export function DoctorScreen() {
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#C0392B" />
-          <Text style={styles.loadingText}>Loading doctors...</Text>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.loadingText}>Coordinating with clinics...</Text>
         </View>
       ) : (
         <FlatList
@@ -157,8 +162,11 @@ export function DoctorScreen() {
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={styles.center}>
-              <Icon name="doctor" size={48} color="#333" />
-              <Text style={styles.emptyText}>No doctors found</Text>
+              <View style={styles.emptyIcon}>
+                <Icon name="doctor" size={48} color={Colors.grayLight} />
+              </View>
+              <Text style={styles.emptyTitle}>No Specialists Found</Text>
+              <Text style={styles.emptySub}>Try adjusting your search or filters.</Text>
             </View>
           }
         />
@@ -168,53 +176,84 @@ export function DoctorScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#0D0D0D' },
-  headerBar: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
-  title: { fontSize: 22, fontWeight: '800', color: '#fff' },
-  subtitle: { fontSize: 12, color: '#888', marginTop: 4 },
+  safe: { flex: 1, backgroundColor: Colors.white },
+  headerBar: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center',
+    paddingHorizontal: 24, 
+    paddingTop: 16, 
+    paddingBottom: 20 
+  },
+  title: { fontSize: 26, fontWeight: '900', color: Colors.textPrimary },
+  subtitle: { fontSize: 13, color: Colors.textTertiary, marginTop: 2, fontWeight: '600' },
+  filterBtn: {
+    width: 48, height: 48, borderRadius: 16, backgroundColor: Colors.grayLight,
+    alignItems: 'center', justifyContent: 'center'
+  },
+
+  searchContainer: { paddingHorizontal: 24, marginBottom: 20 },
   searchWrap: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#1A1A1A', borderRadius: 12,
-    marginHorizontal: 16, marginBottom: 8,
-    paddingHorizontal: 14, paddingVertical: 4,
-    borderWidth: 1, borderColor: '#2A2A2A'
+    backgroundColor: Colors.grayLight, borderRadius: 20,
+    paddingHorizontal: 16, paddingVertical: Platform.OS === 'ios' ? 14 : 4,
   },
-  searchInput: { flex: 1, color: '#fff', fontSize: 15, paddingVertical: 10 },
-  specListContainer: { height: 50, marginBottom: 12 },
-  chips: { paddingHorizontal: 16, alignItems: 'center' },
+  searchInput: { flex: 1, color: Colors.textPrimary, fontSize: 15, fontWeight: '600' },
+
+  specListContainer: { height: 46, marginBottom: 24 },
+  chips: { paddingHorizontal: 24, alignItems: 'center', gap: 10 },
   chip: {
-    backgroundColor: '#1A1A1A', borderRadius: 20,
-    paddingHorizontal: 16, paddingVertical: 8,
-    borderWidth: 1, borderColor: '#2A2A2A',
-    height: 38, justifyContent: 'center', alignItems: 'center'
+    backgroundColor: Colors.grayLight, borderRadius: 14,
+    paddingHorizontal: 16, paddingVertical: 10,
+    justifyContent: 'center', alignItems: 'center'
   },
-  chipActive: { backgroundColor: '#C0392B', borderColor: '#C0392B' },
-  chipText: { fontSize: 13, color: '#888', fontWeight: '600' },
-  chipTextActive: { color: '#fff' },
-  list: { paddingHorizontal: 16, paddingBottom: 32, paddingTop: 8 },
+  chipActive: { 
+    backgroundColor: Colors.primary,
+    shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 3
+  },
+  chipText: { fontSize: 13, color: Colors.textSecondary, fontWeight: '700' },
+  chipTextActive: { color: Colors.white, fontWeight: '800' },
+
+
+  list: { paddingHorizontal: 24, paddingBottom: 40 },
   card: {
-    flexDirection: 'row', backgroundColor: '#1A1A1A',
-    borderRadius: 14, padding: 14, marginBottom: 12,
-    borderWidth: 1, borderColor: '#2A2A2A'
+    flexDirection: 'row', backgroundColor: Colors.white,
+    borderRadius: 24, padding: 16, marginBottom: 16,
+    borderWidth: 1.5, borderColor: Colors.grayLight,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.02, shadowRadius: 10
   },
-  cardLeft: { marginRight: 12 },
+  cardLeft: { marginRight: 16, position: 'relative' },
   avatar: {
-    width: 52, height: 52, borderRadius: 14,
-    backgroundColor: '#2A1A1A', alignItems: 'center', justifyContent: 'center'
+    width: 64, height: 64, borderRadius: 20,
+    alignItems: 'center', justifyContent: 'center'
+  },
+  statusIndicator: {
+    position: 'absolute', bottom: -2, right: -2,
+    width: 14, height: 14, borderRadius: 7,
+    borderWidth: 2, borderColor: Colors.white
   },
   cardBody: { flex: 1 },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 },
-  docName: { flex: 1, fontSize: 15, fontWeight: '700', color: '#fff', marginRight: 8 },
-  statusBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, gap: 4 },
-  statusText: { fontSize: 11, fontWeight: '600' },
-  specialty: { fontSize: 13, color: '#C0392B', fontWeight: '600', marginBottom: 6 },
-  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
-  infoText: { fontSize: 12, color: '#888', flex: 1 },
-  metaRow: { flexDirection: 'row', gap: 12, marginBottom: 4 },
+  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  docName: { flex: 1, fontSize: 16, fontWeight: '800', color: Colors.textPrimary },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  statusText: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase' },
+  specialty: { fontSize: 13, color: Colors.primary, fontWeight: '700', marginBottom: 10 },
+  
+  infoGrid: { gap: 6 },
+  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  infoText: { fontSize: 12, color: Colors.textSecondary, fontWeight: '600' },
+  metaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  metaText: { fontSize: 11, color: '#666' },
-  fee: { fontSize: 12, color: '#27AE60', fontWeight: '600' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60, gap: 12 },
-  loadingText: { color: '#888', fontSize: 14 },
-  emptyText: { color: '#888', fontSize: 14 },
+  metaText: { fontSize: 12, color: Colors.textTertiary, fontWeight: '600' },
+  fee: { fontSize: 14, color: Colors.success, fontWeight: '800' },
+
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
+  loadingText: { color: Colors.textTertiary, fontSize: 14, marginTop: 16, fontWeight: '600' },
+  emptyIcon: { 
+    width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.grayLight,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 20
+  },
+  emptyTitle: { fontSize: 18, fontWeight: '800', color: Colors.textPrimary },
+  emptySub: { fontSize: 13, color: Colors.textTertiary, marginTop: 4, textAlign: 'center' },
 });
+

@@ -56,9 +56,11 @@ export default function Emergencies() {
             key={f}
             className={`filter-tab ${filter === f ? 'active' : ''}`}
             onClick={() => setFilter(f)}>
-            {f === 'all' ? 'All' : f.replace('_', ' ')}
+            {f === 'all' ? 'Overall View' : f.replace('_', ' ')}
             {f === 'pending' && emergencies.filter(e => e.status === 'pending').length > 0 && (
-              <span className="filter-count">{emergencies.filter(e => e.status === 'pending').length}</span>
+              <span className="filter-count">
+                {emergencies.filter(e => e.status === 'pending').length}
+              </span>
             )}
           </button>
         ))}

@@ -34,10 +34,11 @@ export function StatusPill({ label, type }: { label: string; type: StatusPillTyp
 
 const styles = StyleSheet.create({
   pill: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
     alignSelf: 'flex-start',
   },
-  text: { ...Typography.small, fontWeight: '500' },
+  text: { ...Typography.tiny, fontWeight: '800', textTransform: 'uppercase' },
 });
+

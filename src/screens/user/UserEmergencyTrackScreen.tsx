@@ -219,44 +219,59 @@ export function UserEmergencyTrackScreen({ route, navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#000' },
+  safe: { flex: 1, backgroundColor: '#050505' },
   map: { flex: 1 },
   backBtn: {
-    position: 'absolute', top: 56, left: 16, zIndex: 10,
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    alignItems: 'center', justifyContent: 'center'
+    position: 'absolute', top: 56, left: 20, zIndex: 10,
+    width: 46, height: 46, borderRadius: 23, backgroundColor: 'rgba(0,0,0,0.8)',
+    alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)'
   },
+  
   patientMarker: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: '#C0392B',
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: '#fff'
+    width: 44, height: 44, borderRadius: 22, backgroundColor: '#C0392B',
+    alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#fff',
+    shadowColor: '#C0392B', shadowOpacity: 0.5, shadowRadius: 10
   },
   ambMarker: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: '#F39C12',
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: '#fff'
+    width: 48, height: 48, borderRadius: 24, backgroundColor: '#fff',
+    alignItems: 'center', justifyContent: 'center', shadowColor: '#000',
+    shadowOpacity: 0.5, shadowRadius: 10, elevation: 8
   },
+  
   infoCard: {
-    backgroundColor: '#1A1A1A',
-    borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    padding: 20, paddingBottom: 32,
+    backgroundColor: '#0D0D0D', borderTopLeftRadius: 32, borderTopRightRadius: 32,
+    padding: 24, paddingBottom: 40, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+    shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 20
   },
-  statusRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
-  statusDot: { width: 12, height: 12, borderRadius: 6, marginRight: 10 },
-  statusText: { fontSize: 18, fontWeight: '700', color: '#fff' },
+  
+  statusRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 24 },
+  statusDot: { width: 10, height: 10, borderRadius: 5, marginRight: 10, shadowOpacity: 1, shadowRadius: 5 },
+  statusText: { fontSize: 20, fontWeight: '900', color: '#fff', letterSpacing: -0.5 },
+  
   driverInfo: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#2A2A2A', padding: 14, borderRadius: 12, marginBottom: 12
+    backgroundColor: 'rgba(255,255,255,0.03)', padding: 18, borderRadius: 20, 
+    marginBottom: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)'
   },
   driverIcon: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: '#444',
-    alignItems: 'center', justifyContent: 'center', marginRight: 12
+    width: 48, height: 48, borderRadius: 24, backgroundColor: '#1A1A1A',
+    alignItems: 'center', justifyContent: 'center', marginRight: 14,
+    borderWidth: 1, borderColor: '#222'
   },
-  driverName: { fontSize: 16, fontWeight: '700', color: '#fff' },
-  driverSub: { fontSize: 13, color: '#aaa', marginTop: 2 },
-  hospRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 },
-  hospName: { fontSize: 14, color: '#888' },
+  driverName: { fontSize: 16, fontWeight: '800', color: '#fff' },
+  driverSub: { fontSize: 13, color: '#555', marginTop: 2, fontWeight: '600' },
+  
+  otpBadge: {
+    backgroundColor: 'rgba(39, 174, 96, 0.1)', paddingVertical: 8, paddingHorizontal: 16, 
+    borderRadius: 14, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(39, 174, 96, 0.3)'
+  },
+  otpLabel: { fontSize: 10, fontWeight: '900', color: '#27AE60', marginBottom: 2, textTransform: 'uppercase' },
+  otpValue: { fontSize: 18, fontWeight: '900', color: '#fff', letterSpacing: 2 },
+  
+  hospRow: { 
+    flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10,
+    backgroundColor: 'rgba(192, 57, 43, 0.05)', padding: 14, borderRadius: 16,
+    borderWidth: 1, borderColor: 'rgba(192, 57, 43, 0.1)'
+  },
+  hospName: { fontSize: 14, color: '#C0392B', fontWeight: '800' },
 });

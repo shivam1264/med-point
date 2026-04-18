@@ -13,13 +13,12 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [loadingHospitals, setLoadingHospitals] = useState(true);
 
-  // Load hospitals from DB for dropdown
   useEffect(() => {
     api.get('/hospitals?limit=50')
       .then(res => {
         setHospitals(res.data.data || []);
       })
-      .catch(() => setError('Cannot connect to backend. Is server running?'))
+      .catch(() => setError('Connection failed. Please check your backend server.'))
       .finally(() => setLoadingHospitals(false));
   }, []);
 
@@ -32,32 +31,36 @@ export default function Login() {
     try {
       await login(selectedHospital, password);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Login failed. Check password.');
+      setError(err.response?.data?.message || 'Authentication failed. Please verify your password.');
     } finally {
       setLoading(false);
     }
   };
 
-  const selectedHospitalName = hospitals.find(h => h._id === selectedHospital)?.hospitalName;
-
   return (
     <div className="login-page">
       <div className="login-card">
-        <div className="login-icon">🏥</div>
+        <div className="logo-wrapper">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+        </div>
         <h1 className="login-title">MedFlow</h1>
-        <p className="login-sub">Hospital Admin Panel</p>
+        <p className="login-sub">Administrative Management Portal</p>
+
+        {error && <div className="error-msg">{error}</div>}
 
         <form onSubmit={handleSubmit} className="login-form">
           <div className="field">
-            <label>Select Your Hospital</label>
+            <label>Provider Location</label>
             {loadingHospitals ? (
-              <div className="dropdown-loading">Loading hospitals...</div>
+              <div className="hospital-select" style={{ color: '#999' }}>Retrieving hospital list...</div>
             ) : (
               <select
                 value={selectedHospital}
                 onChange={e => setSelectedHospital(e.target.value)}
                 className="hospital-select">
-                <option value="">— Choose Hospital —</option>
+                <option value="">— Select Hospital —</option>
                 {hospitals.map(h => (
                   <option key={h._id} value={h._id}>
                     {h.hospitalName}{h.area ? ` (${h.area})` : ''}
@@ -65,29 +68,24 @@ export default function Login() {
                 ))}
               </select>
             )}
-            {selectedHospitalName && (
-              <div className="selected-badge">✓ {selectedHospitalName}</div>
-            )}
           </div>
 
           <div className="field">
-            <label>Admin Password</label>
+            <label>Security Key</label>
             <input
               type="password"
-              placeholder="Enter hospital admin password"
+              placeholder="Enter admin password"
               value={password}
               onChange={e => setPassword(e.target.value)}
             />
           </div>
 
-          {error && <p className="error-msg">⚠️ {error}</p>}
-
           <button type="submit" className="login-btn" disabled={loading || loadingHospitals}>
-            {loading ? 'Logging in...' : 'Login to Admin Panel'}
+            {loading ? 'Authenticating...' : 'Access Dashboard'}
           </button>
         </form>
 
-        <p className="login-hint">Default password: <code>hospital@123</code></p>
+        <p className="login-hint">Restricted access. Use default: <code>hospital@123</code></p>
       </div>
     </div>
   );

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Alert,
-  ActivityIndicator, Animated, StatusBar, ScrollView, PermissionsAndroid, Platform, Modal
+  ActivityIndicator, Animated, StatusBar, ScrollView, PermissionsAndroid, Platform, Modal, Image
 } from 'react-native';
+
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -11,6 +12,7 @@ import { useAuth } from '../../context/AuthContext';
 import sosService from '../../services/sosService';
 import hospitalService from '../../services/hospitalService';
 import { SOCKET_URL } from '../../config';
+import { Colors } from '../../constants/colors';
 
 import type { Emergency, Hospital } from '../../types';
 
@@ -21,7 +23,7 @@ export function UserHomeScreen({ navigation }: any) {
   const [checkingStatus, setCheckingStatus] = useState(true);
   const [pulseAnim] = useState(new Animated.Value(1));
 
-  // 1. Helper Functions (Defined first to avoid hoisting issues)
+  // 1. Helper Functions
   async function requestLocationPermission() {
     try {
       if (Platform.OS === 'android') {
@@ -94,8 +96,8 @@ export function UserHomeScreen({ navigation }: any) {
   useEffect(() => {
     const pulse = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.12, duration: 800, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1.1, duration: 1000, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
       ])
     );
     pulse.start();
@@ -106,26 +108,21 @@ export function UserHomeScreen({ navigation }: any) {
     requestLocationPermission();
     checkActiveEmergency();
 
-    // 3. Real-time Status Updates via Socket
     if (user?.id) {
       const socket = require('socket.io-client').io(SOCKET_URL, {
         transports: ['websocket']
       });
 
-
       socket.on('connect', () => {
         socket.emit('join_user', user.id);
-        console.log('👤 Home Socket: Joined User Room', user.id);
       });
 
       socket.on('emergency_accepted', (data: any) => {
-        console.log('🚑 SOS Accepted by Driver!', data);
-        checkActiveEmergency(); // Re-fetch full emergency details
-        Alert.alert('🚑 Ambulance Assigned!', `Driver ${data.driverName} has accepted your request and is on the way.`);
+        checkActiveEmergency();
+        Alert.alert('🚑 Ambulance Assigned!', `Driver ${data.driverName} has accepted your request.`);
       });
 
       socket.on('emergency_cancelled', (data: any) => {
-        console.log('🆘 SOS Cancelled!', data);
         setActiveEmergency(null);
         Alert.alert('Cancelled', 'Your emergency request was cancelled.');
       });
@@ -146,26 +143,23 @@ export function UserHomeScreen({ navigation }: any) {
 
     Alert.alert(
       'Cancel SOS',
-      'Are you sure you want to cancel this emergency? This will alert the ambulance driver.',
+      'Are you sure you want to cancel? This will stop medical help.',
       [
-        { text: 'No, Keep Helping', style: 'cancel' },
+        { text: 'Keep SOS', style: 'cancel' },
         { 
-          text: 'Yes, Cancel', 
+          text: 'Confirm Cancel', 
           style: 'destructive',
           onPress: async () => {
             try {
               setLoading(true);
               await sosService.cancelSOS(activeEmergency._id);
               setActiveEmergency(null);
-              Alert.alert('Cancelled', 'Emergency SOS has been successfully cancelled.');
             } catch (err: any) {
-              const errorMsg = err.response?.data?.message || "";
-              if (errorMsg.includes("already completed") || errorMsg.includes("already cancelled")) {
-                setActiveEmergency(null);
-                Alert.alert('Notice', 'This emergency has already been completed or cancelled.');
+              const msg = err.response?.data?.message || "";
+              if (msg.includes("completed") || msg.includes("cancelled")) {
+                 setActiveEmergency(null);
               } else {
-                console.error('Cancel SOS Error:', err.response?.data || err.message);
-                Alert.alert('Error', 'Failed to cancel SOS. Please try again.');
+                Alert.alert('Error', 'Failed to cancel SOS.');
               }
             } finally {
               setLoading(false);
@@ -176,150 +170,187 @@ export function UserHomeScreen({ navigation }: any) {
     );
   }
 
-  const getStatusColor = (status: string) => {
-    if (status === 'accepted' || status === 'in_progress') return '#27AE60';
-    if (status === 'pending') return '#F39C12';
-    return '#888';
-  };
-
-  const getStatusLabel = (status: string) => {
-    if (status === 'pending') return '⏳ Finding ambulance...';
-    if (status === 'accepted') return '🚑 Ambulance is on the way!';
-    if (status === 'in_progress') return '🏥 Taking you to hospital...';
-    return status;
-  };
-
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor="#0D0D0D" />
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
         {/* Header */}
         <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>Hello, {user?.name?.split(' ')[0] || 'Patient'} 👋</Text>
-            <Text style={styles.headerSub}>Stay safe. Help is one tap away.</Text>
+            <Image 
+              source={require('../../assets/images/logo.png')} 
+              style={styles.logoHeader} 
+              resizeMode="contain" 
+            />
+          <View style={styles.profileBtn}>
+            <Icon name="shield-check" size={28} color={Colors.primary} />
           </View>
-          <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
-            <Icon name="logout" size={22} color="#888" />
-          </TouchableOpacity>
         </View>
 
-        {/* Active Emergency Banner */}
-        {activeEmergency && (
-          <View style={[styles.emergencyBanner, { borderColor: getStatusColor(activeEmergency.status) }]}>
-            <Icon name="ambulance" size={24} color={getStatusColor(activeEmergency.status)} />
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={styles.emergencyBannerTitle}>{getStatusLabel(activeEmergency.status)}</Text>
-              {activeEmergency.ambulanceDriverName && (
-                <Text style={styles.emergencyBannerSub}>Driver: {activeEmergency.ambulanceDriverName} · {activeEmergency.ambulanceVehicleNumber}</Text>
-              )}
-              {activeEmergency.hospitalName && (
-                <Text style={styles.emergencyBannerSub}>Hospital: {activeEmergency.hospitalName}</Text>
-              )}
-              <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
-                {(activeEmergency.status === 'accepted' || activeEmergency.status === 'in_progress') && (
-                  <TouchableOpacity
-                    style={{ backgroundColor: '#378ADD', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8 }}
-                    onPress={() => navigation.navigate('UserEmergencyTrack', { emergencyId: activeEmergency._id })}
-                  >
-                    <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Track Live</Text>
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  style={{ backgroundColor: '#222', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: '#444' }}
-                  onPress={handleCancelSOS}
-                >
-                  <Text style={{ color: '#E74C3C', fontSize: 12, fontWeight: '700' }}>Cancel SOS</Text>
-                </TouchableOpacity>
+
+
+        {/* Emergency Alert Banner */}
+        {activeEmergency ? (
+          <View style={[styles.activeBanner, { borderLeftColor: activeEmergency.status === 'pending' ? Colors.warning : Colors.success }]}>
+            <View style={styles.bannerContent}>
+              <View style={styles.bannerRow}>
+                <View style={[styles.statusIndicator, { backgroundColor: activeEmergency.status === 'pending' ? Colors.warning : Colors.success }]} />
+                <Text style={styles.bannerTitle}>
+                  {activeEmergency.status === 'pending' ? 'Dispatching Help...' : 'Ambulance En Route'}
+                </Text>
               </View>
+              {activeEmergency.ambulanceDriverName && (
+                <Text style={styles.bannerSub}>{activeEmergency.ambulanceDriverName} • {activeEmergency.ambulanceVehicleNumber}</Text>
+              )}
             </View>
+            <TouchableOpacity 
+              style={styles.actionBtnTrack}
+              onPress={() => navigation.navigate('UserEmergencyTrack', { emergencyId: activeEmergency._id })}
+            >
+              <Text style={styles.actionBtnText}>Track</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.healthTipBanner}>
+            <Icon name="heart-pulse" size={24} color={Colors.danger} />
+            <Text style={styles.healthTipText}>Help is one tap away in any emergency.</Text>
           </View>
         )}
 
-        {/* SOS Button */}
-        <View style={styles.sosSection}>
-          <Text style={styles.sosLabel}>Emergency SOS</Text>
-          <Animated.View style={[styles.sosPulse, { transform: [{ scale: pulseAnim }] }]}>
-            <TouchableOpacity
-              style={[styles.sosBtn, activeEmergency && styles.sosBtnActive]}
-              onPress={handleSOS}
-              disabled={loading || checkingStatus}
-              activeOpacity={0.8}>
-              {loading ? (
-                <ActivityIndicator size="large" color="#fff" />
-              ) : (
-                <>
-                  <Icon name="alarm-light" size={48} color="#fff" />
-                  <Text style={styles.sosBtnText}>SOS</Text>
-                  <Text style={styles.sosBtnSub}>Tap for Emergency</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </Animated.View>
-          <Text style={styles.sosNote}>
-            {activeEmergency ? 'Active SOS in progress' : 'Press to alert nearest ambulance'}
-          </Text>
+        {/* SOS Center */}
+        <View style={styles.sosContainer}>
+          <Text style={styles.sosPrompt}>Emergency Assistance</Text>
+
+          <View style={styles.pulseWrapper}>
+             <Animated.View style={[styles.pulseOuter, { transform: [{ scale: pulseAnim }] }]} />
+             <TouchableOpacity 
+                style={[styles.sosButton, activeEmergency && styles.sosButtonActive]}
+                onPress={handleSOS}
+                disabled={loading}
+                activeOpacity={0.8}
+             >
+               {loading ? <ActivityIndicator size="large" color={Colors.white} /> : (
+                 <>
+                   <Icon name="alert-decagram" size={60} color={Colors.white} />
+                   <Text style={styles.sosLabelLarge}>SOS</Text>
+                 </>
+               )}
+             </TouchableOpacity>
+          </View>
+          <Text style={styles.sosFooter}>Get immediate help from nearby hospitals</Text>
+
         </View>
 
-        {/* Quick Info Cards */}
-        <View style={styles.cards}>
-          <View style={styles.infoCard}>
-            <Icon name="hospital-building" size={28} color="#C0392B" />
-            <Text style={styles.cardNum}>10+</Text>
-            <Text style={styles.cardLabel}>Hospitals{'\n'}Nearby</Text>
-          </View>
-          <View style={styles.infoCard}>
-            <Icon name="doctor" size={28} color="#27AE60" />
-            <Text style={styles.cardNum}>11+</Text>
-            <Text style={styles.cardLabel}>Doctors{'\n'}Available</Text>
-          </View>
-          <View style={styles.infoCard}>
-            <Icon name="ambulance" size={28} color="#F39C12" />
-            <Text style={styles.cardNum}>24/7</Text>
-            <Text style={styles.cardLabel}>Emergency{'\n'}Service</Text>
-          </View>
+        {/* Navigation Grid */}
+        <View style={styles.grid}>
+          <TouchableOpacity style={styles.gridCard} onPress={() => navigation.navigate('Hospitals')}>
+            <View style={[styles.gridIconBox, { backgroundColor: Colors.infoLight }]}>
+              <Icon name="hospital-building" size={28} color={Colors.info} />
+            </View>
+            <Text style={styles.gridTitle}>Hospitals</Text>
+            <Text style={styles.gridSub}>Nearby Clinics</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.gridCard} onPress={() => navigation.navigate('Doctors')}>
+            <View style={[styles.gridIconBox, { backgroundColor: Colors.successLight }]}>
+              <Icon name="doctor" size={28} color={Colors.success} />
+            </View>
+            <Text style={styles.gridTitle}>Doctors</Text>
+            <Text style={styles.gridSub}>Find Specialist</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.gridCard} onPress={() => navigation.navigate('History')}>
+            <View style={[styles.gridIconBox, { backgroundColor: Colors.warningLight }]}>
+              <Icon name="clipboard-text-outline" size={28} color={Colors.warning} />
+            </View>
+            <Text style={styles.gridTitle}>History</Text>
+            <Text style={styles.gridSub}>Medical Logs</Text>
+          </TouchableOpacity>
+
         </View>
+
+        {/* Panic Actions */}
+        <View style={styles.panicRow}>
+           <TouchableOpacity style={[styles.panicBtn, { backgroundColor: Colors.grayLight }]} onPress={handleCancelSOS}>
+              <Icon name="close-circle-outline" size={20} color={Colors.gray} />
+              <Text style={styles.panicBtnText}>Stop Help</Text>
+           </TouchableOpacity>
+           <TouchableOpacity style={[styles.panicBtn, { backgroundColor: '#FBE9E7' }]}>
+              <Icon name="phone-plus" size={20} color={Colors.danger} />
+              <Text style={[styles.panicBtnText, { color: Colors.danger }]}>Family Call</Text>
+           </TouchableOpacity>
+        </View>
+
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#0D0D0D' },
-  scroll: { paddingHorizontal: 20, paddingBottom: 32 },
+  safe: { flex: 1, backgroundColor: Colors.white },
+  scroll: { paddingBottom: 40 },
   header: {
     flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'flex-start', paddingTop: 20, marginBottom: 20
+    alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, marginBottom: 8
   },
-  greeting: { fontSize: 22, fontWeight: '700', color: '#fff' },
-  headerSub: { fontSize: 13, color: '#888', marginTop: 4 },
-  logoutBtn: { padding: 8 },
-  emergencyBanner: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#1A1A1A', borderRadius: 14,
-    borderWidth: 1.5, padding: 14, marginBottom: 20
+  logoHeader: { width: 140, height: 44 },
+
+  profileBtn: { padding: 4 },
+
+
+  healthTipBanner: {
+    marginHorizontal: 24, backgroundColor: Colors.grayLight,
+    padding: 16, borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 12
   },
-  emergencyBannerTitle: { fontSize: 15, fontWeight: '700', color: '#fff' },
-  emergencyBannerSub: { fontSize: 12, color: '#aaa', marginTop: 2 },
-  sosSection: { alignItems: 'center', marginVertical: 20 },
-  sosLabel: { fontSize: 13, color: '#888', marginBottom: 24, letterSpacing: 1.5, textTransform: 'uppercase' },
-  sosPulse: { marginBottom: 20 },
-  sosBtn: {
+  healthTipText: { flex: 1, fontSize: 14, color: Colors.textSecondary, fontWeight: '700' },
+
+  activeBanner: {
+    marginHorizontal: 24, backgroundColor: Colors.white,
+    padding: 16, borderRadius: 20, flexDirection: 'row', alignItems: 'center',
+    borderWidth: 1, borderColor: Colors.border, borderLeftWidth: 6,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 4
+  },
+  bannerContent: { flex: 1 },
+  bannerRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  statusIndicator: { width: 10, height: 10, borderRadius: 5 },
+  bannerTitle: { fontSize: 16, fontWeight: '800', color: Colors.textPrimary },
+  bannerSub: { fontSize: 12, color: Colors.textSecondary, fontWeight: '600' },
+  actionBtnTrack: { backgroundColor: Colors.info, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 12 },
+  actionBtnText: { color: Colors.white, fontWeight: '800', fontSize: 13 },
+
+  sosContainer: { alignItems: 'center', marginVertical: 40 },
+  sosPrompt: { fontSize: 13, fontWeight: '800', color: Colors.textTertiary, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 30 },
+  pulseWrapper: { alignItems: 'center', justifyContent: 'center' },
+  pulseOuter: {
+    position: 'absolute', width: 240, height: 240, borderRadius: 120,
+    backgroundColor: Colors.dangerLight, opacity: 0.6
+  },
+  sosButton: {
     width: 180, height: 180, borderRadius: 90,
-    backgroundColor: '#C0392B',
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#C0392B', shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6, shadowRadius: 20, elevation: 12
+    backgroundColor: Colors.danger, alignItems: 'center', justifyContent: 'center',
+    shadowColor: Colors.danger, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.4, shadowRadius: 20, elevation: 12,
+    borderWidth: 8, borderColor: 'rgba(255,255,255,0.2)'
   },
-  sosBtnActive: { backgroundColor: '#27AE60', shadowColor: '#27AE60' },
-  sosBtnText: { fontSize: 32, fontWeight: '800', color: '#fff', marginTop: 4 },
-  sosNote: { fontSize: 13, color: '#666', textAlign: 'center' },
-  cards: { flexDirection: 'row', marginTop: 20 },
-  infoCard: {
-    flex: 1, backgroundColor: '#1A1A1A', borderRadius: 14,
-    padding: 16, alignItems: 'center', marginHorizontal: 4
+  sosButtonActive: { backgroundColor: Colors.success, shadowColor: Colors.success },
+  sosLabelLarge: { color: Colors.white, fontSize: 32, fontWeight: '900', marginTop: -4 },
+  sosFooter: { fontSize: 13, color: Colors.textTertiary, marginTop: 32, fontWeight: '700', textAlign: 'center', paddingHorizontal: 40 },
+
+
+  grid: { flexDirection: 'row', paddingHorizontal: 24, gap: 12, marginBottom: 32 },
+  gridCard: {
+    flex: 1, backgroundColor: Colors.white, borderRadius: 24, padding: 16,
+    alignItems: 'center', borderWidth: 1, borderColor: Colors.grayLight,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2
   },
-  cardNum: { fontSize: 22, fontWeight: '800', color: '#fff', marginTop: 8 },
-  cardLabel: { fontSize: 11, color: '#888', textAlign: 'center', marginTop: 4 },
+  gridIconBox: { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  gridTitle: { fontSize: 15, fontWeight: '800', color: Colors.textPrimary },
+  gridSub: { fontSize: 10, color: Colors.textTertiary, fontWeight: '700', marginTop: 2, textTransform: 'uppercase' },
+
+  panicRow: { flexDirection: 'row', paddingHorizontal: 24, gap: 12 },
+  panicBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, paddingVertical: 14, borderRadius: 16
+  },
+  panicBtnText: { fontSize: 14, fontWeight: '800', color: Colors.textSecondary }
 });
+

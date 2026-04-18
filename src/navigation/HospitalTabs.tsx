@@ -17,26 +17,27 @@ export function HospitalTabs() {
         name="Beds"
         component={HospitalAdminScreen}
         options={{
-          tabBarLabel: Labels.beds,
-          tabBarIcon: ({ color, size }) => <Icon name="bed" size={size} color={color} />,
+          tabBarLabel: 'Beds',
+          tabBarIcon: ({ color, size }) => <Icon name="bed-outline" size={size + 2} color={color} />,
         }}
       />
       <Tab.Screen
         name="Incoming"
         component={HospitalIncomingScreen}
         options={{
-          tabBarLabel: Labels.incoming,
-          tabBarIcon: ({ color, size }) => <Icon name="ambulance" size={size} color={color} />,
+          tabBarLabel: 'Incoming',
+          tabBarIcon: ({ color, size }) => <Icon name="ambulance" size={size + 2} color={color} />,
         }}
       />
       <Tab.Screen
         name="Settings"
         component={SettingsScreen}
         options={{
-          tabBarLabel: Labels.settings,
-          tabBarIcon: ({ color, size }) => <Icon name="cog" size={size} color={color} />,
+          tabBarLabel: 'Settings',
+          tabBarIcon: ({ color, size }) => <Icon name="account-settings-outline" size={size + 2} color={color} />,
         }}
       />
     </Tab.Navigator>
+
   );
 }

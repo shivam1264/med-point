@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal,
-  ActivityIndicator, Alert, StatusBar, ScrollView, Linking, TextInput
+  ActivityIndicator, Alert, StatusBar, ScrollView, Linking, TextInput, Image
 } from 'react-native';
+
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Geolocation from '@react-native-community/geolocation';
@@ -10,6 +11,7 @@ import { io, Socket } from 'socket.io-client';
 import { useAuth } from '../../context/AuthContext';
 import sosService from '../../services/sosService';
 import { SOCKET_URL } from '../../config';
+import { Colors } from '../../constants/colors';
 
 import type { Emergency } from '../../types';
 
@@ -30,7 +32,6 @@ export function AmbulanceHomeScreen({ navigation }: any) {
   useEffect(() => {
     if (!driver?.id) return;
 
-    // Connect to backend socket
     const socket = io(SOCKET_URL, {
       transports: ['websocket']
     });
@@ -38,23 +39,19 @@ export function AmbulanceHomeScreen({ navigation }: any) {
     socketRef.current = socket;
 
     socket.on('connect', () => {
-      console.log('Ambulance Socket connected');
-      // Join targeted room for this ambulance
       socket.emit('join_ambulance', driver.id);
     });
 
     socket.on('new_emergency', (data: any) => {
-      console.log('New real-time SOS received:', data);
       setPendingPopup(data);
       setCountdown(30);
     });
 
     socket.on('emergency_cancelled', (data: any) => {
-      console.log('SOS Cancelled by user!', data);
       setActiveEmergency(null);
       setPendingPopup(null);
       setIsAvailable(true);
-      Alert.alert('Cancelled', 'The patient has cancelled the emergency request.');
+      Alert.alert('Mission Cancelled', 'The patient has cancelled the emergency request.');
     });
 
     return () => {
@@ -118,7 +115,7 @@ export function AmbulanceHomeScreen({ navigation }: any) {
       await sosService.updateAmbulanceStatus(driver.id, { isOnline: newOnline, isAvailable: newOnline ? isAvailable : false });
       setIsOnline(newOnline);
       if (!newOnline) setIsAvailable(false);
-    } catch { Alert.alert('Error', 'Could not update status'); }
+    } catch { Alert.alert('Error', 'Update failed'); }
   };
 
   const toggleAvailable = async () => {
@@ -127,18 +124,16 @@ export function AmbulanceHomeScreen({ navigation }: any) {
       const newAvail = !isAvailable;
       await sosService.updateAmbulanceStatus(driver.id, { isAvailable: newAvail });
       setIsAvailable(newAvail);
-    } catch { Alert.alert('Error', 'Could not update availability'); }
+    } catch { Alert.alert('Error', 'Update failed'); }
   };
 
   const handleAccept = async () => {
     if (!pendingPopup) return;
     setLoading(true);
     try {
-      // Handle both _id (backend standard) and id/emergencyId (common in payloads)
       const targetId = pendingPopup._id || pendingPopup.id || pendingPopup.emergencyId;
       if (!targetId) {
-        console.error('Cant accept emergency: No ID found in popup data', pendingPopup);
-        Alert.alert('Error', 'Invalid emergency data. Please try again.');
+        Alert.alert('Error', 'Invalid request data.');
         setPendingPopup(null);
         return;
       }
@@ -147,7 +142,7 @@ export function AmbulanceHomeScreen({ navigation }: any) {
       setPendingPopup(null);
       setIsAvailable(false);
     } catch (err: any) {
-      Alert.alert('Unavailable', err?.response?.data?.message || 'Someone else already accepted this emergency or it was cancelled.');
+      Alert.alert('Request Lapsed', 'Someone else accepted or user cancelled.');
       setPendingPopup(null);
     } finally { setLoading(false); }
   };
@@ -162,337 +157,357 @@ export function AmbulanceHomeScreen({ navigation }: any) {
 
   const handleComplete = async () => {
     if (!activeEmergency) return;
-
     if (otpInput !== activeEmergency.pickupOTP) {
-        Alert.alert('Invalid OTP', 'The verification code does not match. Please ask the patient for the correct code.');
+        Alert.alert('OTP Mismatch', 'Verification code is incorrect.');
         return;
     }
-
     try {
       setLoading(true);
       await sosService.completeEmergency(activeEmergency._id, otpInput);
       setActiveEmergency(null);
-
       setOtpInput('');
       setIsAvailable(true);
       await sosService.updateAmbulanceStatus(driver!.id, { isAvailable: true });
-      Alert.alert('✅ Done', 'Emergency completed. You are now available.');
+      Alert.alert('Mission Success', 'Mission completed and logged.');
     } catch { 
-      Alert.alert('Error', 'Could not complete emergency. Please try again.'); 
+      Alert.alert('Error', 'Failed to complete.'); 
     } finally {
       setLoading(false);
     }
   };
 
-
-  const statusColor = !isOnline ? '#555' : isAvailable ? '#27AE60' : '#F39C12';
-  const statusLabel = !isOnline ? 'Offline' : isAvailable ? 'Available' : 'Unavailable';
+  const statusColor = !isOnline ? Colors.textTertiary : isAvailable ? Colors.success : Colors.warning;
+  const statusLabel = !isOnline ? 'OFFLINE' : isAvailable ? 'READY' : 'BUSY';
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor="#0D0D0D" />
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
 
-      {/* Popup Modal */}
+      {/* EMERGENCY ALERT POPUP */}
       <Modal transparent visible={!!pendingPopup} animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Icon name="alarm-light" size={32} color="#C0392B" />
-              <Text style={styles.modalTitle}>🆘 New Emergency!</Text>
-              <View style={styles.countdownBadge}>
-                <Text style={styles.countdownText}>{countdown}s</Text>
-              </View>
+        <View style={styles.alertOverlay}>
+          <View style={styles.alertCard}>
+            <View style={styles.alertHeader}>
+               <View style={styles.alertIconBg}>
+                  <Icon name="alarm-light" size={32} color={Colors.white} />
+               </View>
+               <View style={styles.alertHeaderInfo}>
+                  <Text style={styles.alertMajor}>EMERGENCY ALERT</Text>
+                  <Text style={styles.alertSub}>Patient requires priority dispatch</Text>
+               </View>
+               <View style={styles.alertTimer}>
+                  <Text style={styles.timerText}>{countdown}s</Text>
+               </View>
             </View>
 
             {pendingPopup && (
-              <>
-                <View style={styles.modalInfo}>
-                  <View style={styles.modalRow}>
-                    <Icon name="map-marker" size={18} color="#888" />
-                    <Text style={styles.modalVal}>{pendingPopup.location?.address || `${pendingPopup.location?.coordinates?.[1]?.toFixed(4)}, ${pendingPopup.location?.coordinates?.[0]?.toFixed(4)}`}</Text>
-                  </View>
-                  {pendingPopup.hospitalName && (
-                    <View style={styles.modalRow}>
-                      <Icon name="hospital" size={18} color="#888" />
-                      <Text style={styles.modalVal}>→ {pendingPopup.hospitalName}</Text>
-                    </View>
-                  )}
-                  <View style={styles.modalRow}>
-                    <Icon name="account" size={18} color="#888" />
-                    <Text style={styles.modalVal}>{pendingPopup.userName || 'Unknown Patient'}</Text>
-                  </View>
-                  {pendingPopup.userEmergencyContact && (
-                    <View style={styles.modalRow}>
-                      <Icon name="phone-alert" size={18} color="#E67E22" />
-                      <Text style={[styles.modalVal, { color: '#E67E22' }]}>Contact: {pendingPopup.userEmergencyContact}</Text>
-                    </View>
-                  )}
-                  <View style={[styles.severityBadge, { backgroundColor: '#C0392B20' }]}>
-
-                    <Text style={[styles.severityText, { color: '#C0392B' }]}>
-                      {(pendingPopup.severity || 'critical').toUpperCase()} EMERGENCY
-                    </Text>
-                  </View>
+              <View style={styles.alertInfoBox}>
+                <View style={styles.alertData}>
+                  <Icon name="map-marker-radius" size={20} color={Colors.danger} />
+                  <Text style={styles.alertVal} numberOfLines={2}>{pendingPopup.location?.address || 'Geolocation Pending'}</Text>
                 </View>
-
-                <View style={styles.modalActions}>
-                  <TouchableOpacity style={styles.declineBtn} onPress={handleDecline}>
-                    <Text style={styles.declineBtnText}>Decline</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.acceptBtn} onPress={handleAccept} disabled={loading}>
-                    {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.acceptBtnText}>✓ Accept</Text>}
-                  </TouchableOpacity>
+                <View style={[styles.alertData, { marginTop: 12 }]}>
+                  <Icon name="account-alert" size={20} color={Colors.info} />
+                  <Text style={styles.alertVal}>{pendingPopup.userName || 'Emergency Request'}</Text>
                 </View>
-              </>
+              </View>
             )}
-          </View>
-        </View>
-      </Modal>
-      
-      {/* OTP Verification Modal */}
-      <Modal transparent visible={showOtpModal} animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.otpModalCard}>
-            <Text style={styles.otpModalTitle}>Verify Patient OTP</Text>
-            <Text style={styles.otpModalSub}>Ask the patient for the 4-digit code shown on their screen.</Text>
-            
-            <TextInput
-              style={styles.otpInput}
-              placeholder="0000"
-              placeholderTextColor="#444"
-              keyboardType="number-pad"
-              maxLength={4}
-              value={otpInput}
-              onChangeText={setOtpInput}
-              autoFocus
-            />
 
-            <View style={styles.modalActions}>
-              <TouchableOpacity 
-                style={styles.declineBtn} 
-                onPress={() => { setShowOtpModal(false); setOtpInput(''); }}
-              >
-                <Text style={styles.declineBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.acceptBtn, { backgroundColor: '#27AE60' }]} 
-                onPress={() => {
-                  setShowOtpModal(false);
-                  handleComplete();
-                }}
-              >
-                <Text style={styles.acceptBtnText}>Verify & Complete</Text>
-              </TouchableOpacity>
+            <View style={styles.alertActions}>
+               <TouchableOpacity style={styles.declineAction} onPress={handleDecline}>
+                  <Text style={styles.declineText}>Decline</Text>
+               </TouchableOpacity>
+               <TouchableOpacity style={styles.acceptAction} onPress={handleAccept} disabled={loading}>
+                  {loading ? <ActivityIndicator color={Colors.white} /> : (
+                    <>
+                      <Icon name="check-bold" size={20} color={Colors.white} />
+                      <Text style={styles.acceptText}>Accept Mission</Text>
+                    </>
+                  )}
+               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
 
-      <ScrollView contentContainerStyle={styles.scroll}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>Driver: {driver?.driverName || 'Driver'}</Text>
-            <Text style={styles.subGreeting}>{driver?.vehicleNumber} · {driver?.vehicleType}</Text>
-          </View>
-          <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
-            <Icon name="logout" size={22} color="#888" />
-          </TouchableOpacity>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* TOP BAR */}
+        <View style={styles.topBar}>
+           <View>
+              <Text style={styles.unitName}>{driver?.driverName}</Text>
+              <Text style={styles.vehicleId}>{driver?.vehicleNumber} • {driver?.hospitalName}</Text>
+           </View>
+           <Image 
+              source={require('../../assets/images/logo.png')} 
+              style={styles.logoHeader} 
+              resizeMode="contain" 
+           />
+
+
         </View>
 
-        {/* Status Card */}
-        <View style={styles.statusCard}>
-          <View style={styles.statusRow}>
-            <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-            <Text style={[styles.statusLabel, { color: statusColor }]}>{statusLabel}</Text>
-          </View>
-          <Text style={styles.statusHint}>
-            {!isOnline ? 'Go online to receive emergencies' : isAvailable ? 'Waiting for SOS alerts...' : 'Toggle available to receive trips'}
-          </Text>
-          <View style={styles.toggleRow}>
-            <TouchableOpacity style={[styles.toggleBtn, isOnline && styles.toggleBtnActive]} onPress={toggleOnline}>
-              <Icon name={isOnline ? 'wifi' : 'wifi-off'} size={18} color={isOnline ? '#fff' : '#666'} />
-              <Text style={[styles.toggleBtnText, isOnline && styles.toggleBtnTextActive]}>
-                {isOnline ? 'Online' : 'Go Online'}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.toggleBtn, isAvailable && styles.availBtn]}
-              onPress={toggleAvailable}
-              disabled={!isOnline}>
-              <Icon name="check-circle" size={18} color={isAvailable ? '#fff' : '#666'} />
-              <Text style={[styles.toggleBtnText, isAvailable && styles.toggleBtnTextActive]}>
-                {isAvailable ? 'Available' : 'Go Available'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+        {/* STATUS DASHBOARD */}
+        <View style={styles.dashCard}>
+           <View style={styles.statusMain}>
+              <View style={[styles.statusPulse, { backgroundColor: statusColor + '20' }]}>
+                 <View style={[styles.statusCore, { backgroundColor: statusColor }]} />
+              </View>
+              <View>
+                 <Text style={styles.statusBig}>{statusLabel}</Text>
+                 <Text style={styles.statusSmall}>
+                    {!isOnline ? 'Commander is currently offline' : isAvailable ? 'Awaiting emergency dispatch' : 'Engaged in active mission'}
+                 </Text>
+              </View>
+           </View>
+
+           <View style={styles.controlRow}>
+              <TouchableOpacity 
+                 style={[styles.controlBtn, isOnline ? styles.controlOnline : styles.controlOffline]} 
+                 onPress={toggleOnline}
+              >
+                 <Icon name="power" size={20} color={isOnline ? Colors.white : Colors.textSecondary} />
+                 <Text style={[styles.controlText, { color: isOnline ? Colors.white : Colors.textSecondary }]}>
+                    {isOnline ? 'ONLINE' : 'OFFLINE'}
+                 </Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                 style={[styles.controlBtn, isAvailable ? styles.controlAvail : styles.controlBusy]} 
+                 onPress={toggleAvailable}
+                 disabled={!isOnline}
+              >
+                 <Icon name="radio-tower" size={20} color={isAvailable ? Colors.white : Colors.textSecondary} />
+                 <Text style={[styles.controlText, { color: isAvailable ? Colors.white : Colors.textSecondary }]}>
+                    {isAvailable ? 'AVAILABLE' : 'BUSY'}
+                 </Text>
+              </TouchableOpacity>
+           </View>
         </View>
 
-        {/* Active Emergency */}
+        {/* ACTIVE MISSION CARD */}
         {activeEmergency && (
-          <View style={styles.activeCard}>
-            <Text style={styles.activeTitle}>🚨 Active Emergency</Text>
-            <View style={styles.activeRow}>
-              <Icon name="map-marker" size={16} color="#888" />
-              <Text style={styles.activeVal}>{activeEmergency.location?.address || 'GPS Location'}</Text>
-            </View>
-            {activeEmergency.hospitalName && (
-              <View style={styles.activeRow}>
-                <Icon name="hospital" size={16} color="#888" />
-                <Text style={styles.activeVal}>{activeEmergency.hospitalName}</Text>
-              </View>
-            )}
-            <View style={styles.activeRow}>
-              <Icon name="account" size={16} color="#888" />
-              <Text style={styles.activeVal}>{activeEmergency.userName} · {activeEmergency.userPhone}</Text>
-            </View>
-            <View style={styles.activeRow}>
-              <Icon name="phone-alert" size={16} color="#E67E22" />
-              <Text style={[styles.activeVal, { color: '#E67E22' }]}>Emergency: {activeEmergency.userEmergencyContact}</Text>
-            </View>
+          <View style={styles.missionCard}>
+             <View style={styles.missionHeader}>
+                <View style={styles.missionBadge}>
+                   <Text style={styles.missionBadgeText}>ACTIVE TRIP</Text>
+                </View>
+                <TouchableOpacity onPress={() => activeEmergency.userPhone && Linking.openURL(`tel:${activeEmergency.userPhone}`)}>
+                   <Icon name="phone-outgoing" size={22} color={Colors.info} />
+                </TouchableOpacity>
+             </View>
 
-            <View style={styles.otpSection}>
-              <Text style={styles.otpLabel}>Verify Patient OTP to Complete:</Text>
-              <View style={styles.otpContainer}>
-                {[0, 1, 2, 3].map((i) => (
-                  <View key={i} style={styles.otpDot}>
-                     <Text style={styles.otpDotText}>{otpInput[i] || '•'}</Text>
-                  </View>
-                ))}
-              </View>
-              <TouchableOpacity style={styles.otpInputTrigger} onPress={() => setShowOtpModal(true)}>
-                <Text style={styles.otpInputTriggerText}>Enter Verification Code</Text>
-              </TouchableOpacity>
-            </View>
+             <View style={styles.missionInfo}>
+                <View style={styles.missionRow}>
+                   <Icon name="account" size={20} color={Colors.textTertiary} />
+                   <Text style={styles.missionText}>{activeEmergency.userName} • {activeEmergency.userPhone}</Text>
+                </View>
+                <View style={styles.missionRow}>
+                   <Icon name="map-marker-circle" size={20} color={Colors.danger} />
+                   <Text style={styles.missionText} numberOfLines={2}>{activeEmergency.location?.address || 'Coordinates Only'}</Text>
+                </View>
+             </View>
 
-            <View style={styles.activeActions}>
-              <TouchableOpacity
-                style={styles.callPatientBtn}
-                onPress={() => activeEmergency.userPhone && Linking.openURL(`tel:${activeEmergency.userPhone}`)}>
-                <Icon name="phone" size={18} color="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.navigateBtn}
-                onPress={() => navigation.navigate('AmbulanceNav', { emergency: activeEmergency })}>
-                <Icon name="navigation" size={16} color="#fff" />
-                <Text style={styles.navigateBtnText}>Navigate</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.completeBtn} onPress={handleComplete}>
-                <Icon name="check-all" size={16} color="#fff" />
-                <Text style={styles.completeBtnText}>Complete</Text>
-              </TouchableOpacity>
-            </View>
+             <View style={styles.otpDivider}>
+                <Text style={styles.otpHeader}>PATIENT PICKUP VERIFICATION</Text>
+                <View style={styles.otpSlotRow}>
+                   {[0, 1, 2, 3].map(i => (
+                     <View key={i} style={styles.otpSlot}>
+                        <Text style={styles.otpSlotVal}>{otpInput[i] || '•'}</Text>
+                     </View>
+                   ))}
+                </View>
+                <TouchableOpacity style={styles.otpEntryBtn} onPress={() => setShowOtpModal(true)}>
+                   <Text style={styles.otpEntryText}>VERIFY PICKUP CODE</Text>
+                </TouchableOpacity>
+             </View>
+
+             <View style={styles.missionActions}>
+                <TouchableOpacity style={styles.mapAction} onPress={() => navigation.navigate('AmbulanceNav', { emergency: activeEmergency })}>
+                   <Icon name="compass-outline" size={20} color={Colors.white} />
+                   <Text style={styles.mapActionText}>OPEN NAVIGATION</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.finishAction} onPress={handleComplete}>
+                   <Icon name="check-all" size={20} color={Colors.white} />
+                   <Text style={styles.finishActionText}>COMPLETE</Text>
+                </TouchableOpacity>
+             </View>
           </View>
         )}
 
-        {/* Hospital Info */}
-        {driver?.hospitalName && (
-          <View style={styles.hospitalCard}>
-            <Icon name="hospital-building" size={20} color="#C0392B" />
-            <Text style={styles.hospitalText}>{driver.hospitalName}</Text>
-          </View>
-        )}
+        {/* VERIFICATION MODAL */}
+        <Modal transparent visible={showOtpModal} animationType="fade">
+           <View style={styles.otpOverlay}>
+              <View style={styles.otpSheet}>
+                 <Text style={styles.otpSheetTitle}>Verify Patient</Text>
+                 <Text style={styles.otpSheetInfo}>Enter the 4-digit security code from the patient's device.</Text>
+                 <TextInput
+                   style={styles.otpHiddenInput}
+                   keyboardType="number-pad"
+                   maxLength={4}
+                   value={otpInput}
+                   onChangeText={setOtpInput}
+                   autoFocus
+                   placeholder="----"
+                   placeholderTextColor={Colors.border}
+                 />
+                 <View style={styles.otpSheetActions}>
+                    <TouchableOpacity style={styles.otpSheetCancel} onPress={() => { setShowOtpModal(false); setOtpInput(''); }}>
+                       <Text style={styles.otpSheetCancelText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.otpSheetConfirm} onPress={() => { setShowOtpModal(false); handleComplete(); }}>
+                       <Text style={styles.otpSheetConfirmText}>CONFIRM PICKUP</Text>
+                    </TouchableOpacity>
+                 </View>
+              </View>
+           </View>
+        </Modal>
+
+        {/* RECENT LOGS SUMMARY */}
+        <View style={styles.logsMeta}>
+           <Text style={styles.metaTitle}>DAILY OPERATIONS</Text>
+           <View style={styles.statsRow}>
+              <View style={styles.statBox}>
+                 <Text style={styles.statVal}>08</Text>
+                 <Text style={styles.statLabel}>Trips</Text>
+              </View>
+              <View style={styles.statBox}>
+                 <Text style={styles.statVal}>4.8</Text>
+                 <Text style={styles.statLabel}>Rating</Text>
+              </View>
+              <View style={styles.statBox}>
+                 <Text style={styles.statVal}>120</Text>
+                 <Text style={styles.statLabel}>Mins</Text>
+              </View>
+           </View>
+        </View>
+
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#0D0D0D' },
-  scroll: { padding: 20, paddingBottom: 40 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
-  greeting: { fontSize: 20, fontWeight: '700', color: '#fff' },
-  subGreeting: { fontSize: 13, color: '#888', marginTop: 3 },
-  logoutBtn: { padding: 6 },
-  statusCard: {
-    backgroundColor: '#1A1A1A', borderRadius: 16,
-    padding: 18, marginBottom: 16, borderWidth: 1, borderColor: '#2A2A2A'
+  safe: { flex: 1, backgroundColor: Colors.white },
+  scroll: { paddingBottom: 40 },
+  topBar: { 
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', 
+    paddingHorizontal: 24, paddingTop: 20, marginBottom: 24 
   },
-  statusRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  statusDot: { width: 10, height: 10, borderRadius: 5, marginRight: 8 },
-  statusLabel: { fontSize: 18, fontWeight: '700' },
-  statusHint: { fontSize: 13, color: '#666', marginBottom: 14 },
-  toggleRow: { flexDirection: 'row', gap: 10 },
-  toggleBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, backgroundColor: '#2A2A2A', borderRadius: 10, paddingVertical: 10
+  unitName: { fontSize: 22, fontWeight: '900', color: Colors.textPrimary, letterSpacing: -0.5 },
+  vehicleId: { fontSize: 13, color: Colors.textSecondary, fontWeight: '700', marginTop: 2, textTransform: 'uppercase' },
+  logoHeader: { width: 120, height: 40 },
+
+
+
+  dashCard: { 
+    marginHorizontal: 24, backgroundColor: Colors.white, borderRadius: 28, padding: 24,
+    borderWidth: 1.5, borderColor: Colors.grayLight,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.04, shadowRadius: 12, elevation: 4
   },
-  toggleBtnActive: { backgroundColor: '#C0392B' },
-  availBtn: { backgroundColor: '#27AE60' },
-  toggleBtnText: { color: '#666', fontWeight: '600', fontSize: 14 },
-  toggleBtnTextActive: { color: '#fff' },
-  activeCard: {
-    backgroundColor: '#1A0A0A', borderRadius: 16,
-    padding: 16, borderWidth: 1.5, borderColor: '#C0392B', marginBottom: 16
+  statusMain: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 24 },
+  statusPulse: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
+  statusCore: { width: 16, height: 16, borderRadius: 8 },
+  statusBig: { fontSize: 24, fontWeight: '900', color: Colors.textPrimary, letterSpacing: 0.5 },
+  statusSmall: { fontSize: 13, color: Colors.textTertiary, fontWeight: '600', marginTop: 2 },
+
+  controlRow: { flexDirection: 'row', gap: 12 },
+  controlBtn: { 
+     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', 
+     gap: 10, paddingVertical: 14, borderRadius: 16, borderWidth: 1.5
   },
-  activeTitle: { fontSize: 16, fontWeight: '700', color: '#fff', marginBottom: 12 },
-  activeRow: { flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8 },
-  activeVal: { flex: 1, fontSize: 13, color: '#ccc' },
-  activeActions: { flexDirection: 'row', gap: 10, marginTop: 12 },
-  navigateBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, backgroundColor: '#378ADD', borderRadius: 10, paddingVertical: 10
+  controlText: { fontWeight: '800', fontSize: 13 },
+  controlOffline: { backgroundColor: Colors.grayLight, borderColor: Colors.grayLight },
+  controlOnline: { backgroundColor: Colors.info, borderColor: Colors.info, shadowOpacity: 0.2, shadowRadius: 8, elevation: 3 },
+  controlAvail: { backgroundColor: Colors.success, borderColor: Colors.success, shadowOpacity: 0.2, shadowRadius: 8, elevation: 3 },
+  controlBusy: { backgroundColor: Colors.grayLight, borderColor: Colors.grayLight },
+
+  missionCard: { 
+    marginHorizontal: 24, marginTop: 24, backgroundColor: Colors.white, borderRadius: 28, padding: 24,
+    borderWidth: 2, borderColor: Colors.dangerLight,
+    shadowColor: Colors.danger, shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.08, shadowRadius: 15, elevation: 4
   },
-  navigateBtnText: { color: '#fff', fontWeight: '600', fontSize: 14 },
-  completeBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, backgroundColor: '#27AE60', borderRadius: 10, paddingVertical: 10
+  missionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  missionBadge: { backgroundColor: Colors.danger, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
+  missionBadgeText: { color: Colors.white, fontSize: 11, fontWeight: '900', letterSpacing: 1 },
+  missionInfo: { gap: 12, marginBottom: 24 },
+  missionRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  missionText: { flex: 1, fontSize: 14, color: Colors.textPrimary, fontWeight: '700' },
+
+  otpDivider: { 
+    backgroundColor: Colors.grayLight, borderRadius: 20, padding: 16, marginBottom: 24, alignItems: 'center' 
   },
-  completeBtnText: { color: '#fff', fontWeight: '600', fontSize: 14 },
-  callPatientBtn: {
-    width: 44, height: 44, borderRadius: 10,
-    backgroundColor: '#E67E22', alignItems: 'center', justifyContent: 'center'
+  otpHeader: { fontSize: 11, fontWeight: '800', color: Colors.textTertiary, marginBottom: 16, letterSpacing: 1 },
+  otpSlotRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
+  otpSlot: { 
+    width: 48, height: 48, borderRadius: 12, backgroundColor: Colors.white, 
+    alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: Colors.border 
   },
-  hospitalCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: '#1A1A1A', borderRadius: 12, padding: 14
+  otpSlotVal: { fontSize: 20, fontWeight: '900', color: Colors.textPrimary },
+  otpEntryBtn: { width: '100%', backgroundColor: Colors.danger, paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
+  otpEntryText: { color: Colors.white, fontWeight: '900', fontSize: 13 },
+
+  missionActions: { flexDirection: 'row', gap: 12 },
+  mapAction: { 
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', 
+    gap: 8, backgroundColor: Colors.info, paddingVertical: 14, borderRadius: 16 
   },
-  hospitalText: { fontSize: 14, color: '#aaa' },
-  // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'flex-end' },
-  modalCard: {
-    backgroundColor: '#1A1A1A', borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    padding: 24, paddingBottom: 36
+  mapActionText: { color: Colors.white, fontWeight: '900', fontSize: 13 },
+  finishAction: { 
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', 
+    gap: 8, backgroundColor: Colors.success, paddingVertical: 14, borderRadius: 16 
   },
-  modalHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, gap: 10 },
-  modalTitle: { flex: 1, fontSize: 20, fontWeight: '800', color: '#fff' },
-  countdownBadge: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: '#C0392B', alignItems: 'center', justifyContent: 'center'
+  finishActionText: { color: Colors.white, fontWeight: '900', fontSize: 13 },
+
+  logsMeta: { padding: 24, marginTop: 8 },
+  metaTitle: { fontSize: 12, fontWeight: '800', color: Colors.textTertiary, letterSpacing: 1.5, marginBottom: 16 },
+  statsRow: { flexDirection: 'row', gap: 12 },
+  statBox: { 
+    flex: 1, backgroundColor: Colors.white, borderRadius: 20, padding: 16, 
+    borderWidth: 1.5, borderColor: Colors.grayLight, alignItems: 'center' 
   },
-  countdownText: { color: '#fff', fontWeight: '800', fontSize: 14 },
-  modalInfo: { backgroundColor: '#0D0D0D', borderRadius: 12, padding: 14, marginBottom: 20 },
-  modalRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 10 },
-  modalVal: { flex: 1, color: '#ddd', fontSize: 14 },
-  severityBadge: { borderRadius: 8, padding: 8, alignItems: 'center', marginTop: 4 },
-  severityText: { fontWeight: '800', fontSize: 13, letterSpacing: 1 },
-  modalActions: { flexDirection: 'row', gap: 12 },
-  declineBtn: {
-    flex: 1, backgroundColor: '#2A2A2A', borderRadius: 12,
-    paddingVertical: 14, alignItems: 'center'
+  statVal: { fontSize: 20, fontWeight: '900', color: Colors.textPrimary },
+  statLabel: { fontSize: 11, color: Colors.textTertiary, fontWeight: '700', marginTop: 2 },
+
+  // ALERT OVERLAY
+  alertOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 },
+  alertCard: { 
+    backgroundColor: Colors.white, borderRadius: 32, padding: 24,
+    shadowColor: Colors.danger, shadowOffset: { width: 0, height: 20 }, shadowOpacity: 0.3, shadowRadius: 30, elevation: 20
   },
-  declineBtnText: { color: '#888', fontWeight: '700', fontSize: 16 },
-  acceptBtn: {
-    flex: 2, backgroundColor: '#C0392B', borderRadius: 12,
-    paddingVertical: 14, alignItems: 'center'
+  alertHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 24 },
+  alertIconBg: { width: 56, height: 56, borderRadius: 20, backgroundColor: Colors.danger, alignItems: 'center', justifyContent: 'center' },
+  alertHeaderInfo: { flex: 1 },
+  alertMajor: { fontSize: 20, fontWeight: '900', color: Colors.danger, letterSpacing: -0.5 },
+  alertSub: { fontSize: 13, color: Colors.textSecondary, fontWeight: '600' },
+  alertTimer: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.grayLight, alignItems: 'center', justifyContent: 'center' },
+  timerText: { fontSize: 16, fontWeight: '900', color: Colors.textPrimary },
+  alertInfoBox: { backgroundColor: Colors.grayLight, borderRadius: 20, padding: 20, marginBottom: 32 },
+  alertData: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
+  alertVal: { flex: 1, fontSize: 15, color: Colors.textPrimary, fontWeight: '700', lineHeight: 22 },
+  alertActions: { flexDirection: 'row', gap: 12 },
+  declineAction: { flex: 1, paddingVertical: 16, alignItems: 'center', borderRadius: 16, backgroundColor: Colors.grayLight },
+  declineText: { fontSize: 15, fontWeight: '800', color: Colors.textSecondary },
+  acceptAction: { 
+    flex: 2, flexDirection: 'row', gap: 10, paddingVertical: 16, 
+    alignItems: 'center', justifyContent: 'center', borderRadius: 16, backgroundColor: Colors.danger 
   },
-  acceptBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  otpModalCard: {
-    backgroundColor: '#1A1A1A', borderRadius: 24, padding: 24, width: '85%',
-    borderWidth: 1, borderColor: '#333', alignSelf: 'center', marginBottom: '20%'
+  acceptText: { fontSize: 15, fontWeight: '900', color: Colors.white },
+
+  // OTP SHEET
+  otpOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  otpSheet: { 
+    backgroundColor: Colors.white, borderTopLeftRadius: 36, borderTopRightRadius: 36, padding: 32,
+    paddingBottom: Platform.OS === 'ios' ? 44 : 32
   },
-  otpModalTitle: { fontSize: 20, fontWeight: '800', color: '#fff', textAlign: 'center', marginBottom: 8 },
-  otpModalSub: { fontSize: 13, color: '#888', textAlign: 'center', marginBottom: 24 },
-  otpInput: {
-    backgroundColor: '#0D0D0D', borderRadius: 12, height: 60,
-    fontSize: 28, fontWeight: '800', color: '#fff', textAlign: 'center',
-    letterSpacing: 10, marginBottom: 24, borderWidth: 1, borderColor: '#333'
+  otpSheetTitle: { fontSize: 24, fontWeight: '900', color: Colors.textPrimary, textAlign: 'center' },
+  otpSheetInfo: { fontSize: 14, color: Colors.textSecondary, fontWeight: '600', textAlign: 'center', marginTop: 8, marginBottom: 24 },
+  otpHiddenInput: { 
+     backgroundColor: Colors.grayLight, borderRadius: 20, height: 72, fontSize: 36, 
+     fontWeight: '900', color: Colors.textPrimary, textAlign: 'center', letterSpacing: 20, marginBottom: 32 
   },
-  otpSection: { marginBottom: 15 },
-  otpLabel: { fontSize: 12, fontWeight: '600', color: '#888', marginBottom: 10 },
-  otpContainer: { flexDirection: 'row', gap: 10, marginBottom: 15 },
-  otpDot: { width: 44, height: 44, borderRadius: 10, backgroundColor: '#2A2A2A', alignItems: 'center', justifyContent: 'center' },
-  otpDotText: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  otpInputTrigger: { backgroundColor: '#C0392B20', paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
-  otpInputTriggerText: { color: '#C0392B', fontWeight: '700', fontSize: 13 },
+  otpSheetActions: { flexDirection: 'row', gap: 12 },
+  otpSheetCancel: { flex: 1, paddingVertical: 16, alignItems: 'center', borderRadius: 16 },
+  otpSheetCancelText: { fontSize: 15, color: Colors.textTertiary, fontWeight: '800' },
+  otpSheetConfirm: { flex: 2, backgroundColor: Colors.success, paddingVertical: 16, alignItems: 'center', borderRadius: 16 },
+  otpSheetConfirmText: { fontSize: 15, color: Colors.white, fontWeight: '900' }
 });
+

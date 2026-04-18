@@ -19,42 +19,35 @@ export type AmbStackParamList = {
 const Tab = createBottomTabNavigator<AmbTabParamList>();
 const Stack = createStackNavigator<AmbStackParamList>();
 
-const tabBarStyle = {
-  backgroundColor: '#111',
-  borderTopColor: '#222',
-  paddingBottom: 4,
-  height: 60,
-};
+import { tabScreenOptions } from './headerStyles';
 
 function AmbulanceTabNavigator() {
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle,
-        tabBarActiveTintColor: '#C0392B',
-        tabBarInactiveTintColor: '#555',
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        ...tabScreenOptions,
       }}>
       <Tab.Screen
         name="Home"
         component={AmbulanceHomeScreen}
         options={{
-          tabBarLabel: 'Dashboard',
-          tabBarIcon: ({ color, size }) => <Icon name="view-dashboard" size={size} color={color} />,
+          tabBarLabel: 'Fleet',
+          tabBarIcon: ({ color, size }) => <Icon name="view-dashboard-outline" size={size + 2} color={color} />,
         }}
       />
       <Tab.Screen
         name="Profile"
         component={AmbulanceProfileScreen}
         options={{
-          tabBarLabel: 'Profile',
-          tabBarIcon: ({ color, size }) => <Icon name="account" size={size} color={color} />,
+          tabBarLabel: 'Operator',
+          tabBarIcon: ({ color, size }) => <Icon name="account-group-outline" size={size + 2} color={color} />,
         }}
       />
     </Tab.Navigator>
   );
 }
+
 
 export function AmbulanceTabs() {
   return (

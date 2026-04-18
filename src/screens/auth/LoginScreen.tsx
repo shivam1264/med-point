@@ -7,6 +7,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAuth } from '../../context/AuthContext';
+import { Colors } from '../../constants/colors';
 import type { AuthRole } from '../../types';
 
 type Tab = 'user' | 'ambulance';
@@ -49,17 +50,17 @@ export function LoginScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor="#0D0D0D" />
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.kav}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
 
           {/* Logo */}
           <View style={styles.logoWrap}>
             <View style={styles.logoIcon}>
-              <Icon name="shield-cross" size={36} color="#fff" />
+              <Icon name="shield-cross" size={40} color={Colors.white} />
             </View>
             <Text style={styles.appTitle}>MedFlow</Text>
-            <Text style={styles.appSub}>Emergency Healthcare System</Text>
+            <Text style={styles.appSub}>Reliable Emergency Healthcare</Text>
           </View>
 
           {/* Role Tabs */}
@@ -67,14 +68,14 @@ export function LoginScreen({ navigation }: any) {
             <TouchableOpacity
               style={[styles.tab, tab === 'user' && styles.tabActive]}
               onPress={() => setTab('user')}>
-              <Icon name="account" size={20} color={tab === 'user' ? '#fff' : '#888'} />
+              <Icon name="account" size={18} color={tab === 'user' ? Colors.white : Colors.textSecondary} />
               <Text style={[styles.tabText, tab === 'user' && styles.tabTextActive]}>Patient</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.tab, tab === 'ambulance' && styles.tabActive]}
               onPress={() => setTab('ambulance')}>
-              <Icon name="ambulance" size={20} color={tab === 'ambulance' ? '#fff' : '#888'} />
-              <Text style={[styles.tabText, tab === 'ambulance' && styles.tabTextActive]}>Ambulance Driver</Text>
+              <Icon name="ambulance" size={18} color={tab === 'ambulance' ? Colors.white : Colors.textSecondary} />
+              <Text style={[styles.tabText, tab === 'ambulance' && styles.tabTextActive]}>Driver</Text>
             </TouchableOpacity>
           </View>
 
@@ -83,11 +84,11 @@ export function LoginScreen({ navigation }: any) {
             {tab === 'user' ? (
               <>
                 <View style={styles.inputWrap}>
-                  <Icon name="phone" size={20} color="#C0392B" style={styles.inputIcon} />
+                  <Icon name="phone" size={20} color={Colors.danger} style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
                     placeholder="Mobile Number"
-                    placeholderTextColor="#555"
+                    placeholderTextColor={Colors.textTertiary}
                     value={phone}
                     onChangeText={setPhone}
                     keyboardType="phone-pad"
@@ -95,56 +96,56 @@ export function LoginScreen({ navigation }: any) {
                   />
                 </View>
                 <View style={styles.inputWrap}>
-                  <Icon name="lock" size={20} color="#C0392B" style={styles.inputIcon} />
+                  <Icon name="lock" size={20} color={Colors.danger} style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
                     placeholder="Password"
-                    placeholderTextColor="#555"
+                    placeholderTextColor={Colors.textTertiary}
                     value={password}
                     onChangeText={setPassword}
                     secureTextEntry={!showPass}
                   />
                   <TouchableOpacity onPress={() => setShowPass(!showPass)} style={styles.eyeBtn}>
-                    <Icon name={showPass ? 'eye-off' : 'eye'} size={20} color="#555" />
+                    <Icon name={showPass ? 'eye-off' : 'eye'} size={20} color={Colors.gray} />
                   </TouchableOpacity>
                 </View>
               </>
             ) : (
               <>
                 <View style={styles.inputWrap}>
-                  <Icon name="card-account-details" size={20} color="#C0392B" style={styles.inputIcon} />
+                  <Icon name="card-account-details" size={20} color={Colors.danger} style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
                     placeholder="Driver ID (e.g. DRV-1234)"
-                    placeholderTextColor="#555"
+                    placeholderTextColor={Colors.textTertiary}
                     value={driverId}
                     onChangeText={setDriverId}
                     autoCapitalize="characters"
                   />
                 </View>
                 <View style={styles.inputWrap}>
-                  <Icon name="lock" size={20} color="#C0392B" style={styles.inputIcon} />
+                  <Icon name="lock" size={20} color={Colors.danger} style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
                     placeholder="Password"
-                    placeholderTextColor="#555"
+                    placeholderTextColor={Colors.textTertiary}
                     value={driverPass}
                     onChangeText={setDriverPass}
                     secureTextEntry={!showPass}
                   />
                   <TouchableOpacity onPress={() => setShowPass(!showPass)} style={styles.eyeBtn}>
-                    <Icon name={showPass ? 'eye-off' : 'eye'} size={20} color="#555" />
+                    <Icon name={showPass ? 'eye-off' : 'eye'} size={20} color={Colors.gray} />
                   </TouchableOpacity>
                 </View>
                 <Text style={styles.driverHint}>
-                  Credentials are assigned by your Hospital Admin
+                  Credentials assigned by your hospital admin.
                 </Text>
               </>
             )}
 
             <TouchableOpacity style={styles.loginBtn} onPress={handleLogin} disabled={loading}>
               {loading ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={Colors.white} />
               ) : (
                 <Text style={styles.loginBtnText}>Login</Text>
               )}
@@ -155,7 +156,7 @@ export function LoginScreen({ navigation }: any) {
                 style={styles.registerLink}
                 onPress={() => navigation.navigate('Register')}>
                 <Text style={styles.registerLinkText}>
-                  New patient? <Text style={styles.registerLinkBold}>Register here</Text>
+                  Don't have an account? <Text style={styles.registerLinkBold}>Join now</Text>
                 </Text>
               </TouchableOpacity>
             )}
@@ -167,49 +168,51 @@ export function LoginScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#0D0D0D' },
+  safe: { flex: 1, backgroundColor: Colors.white },
   kav: { flex: 1 },
-  scroll: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 40 },
-  logoWrap: { alignItems: 'center', marginBottom: 40 },
+  scroll: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 28, paddingVertical: 40 },
+  logoWrap: { alignItems: 'center', marginBottom: 48 },
   logoIcon: {
-    width: 72, height: 72, borderRadius: 20,
-    backgroundColor: '#C0392B',
+    width: 80, height: 80, borderRadius: 24,
+    backgroundColor: Colors.danger,
     alignItems: 'center', justifyContent: 'center',
-    marginBottom: 12,
-    shadowColor: '#C0392B', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 12,
+    marginBottom: 16,
+    shadowColor: Colors.danger, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 12,
     elevation: 8,
   },
-  appTitle: { fontSize: 32, fontWeight: '800', color: '#fff', letterSpacing: 1 },
-  appSub: { fontSize: 13, color: '#888', marginTop: 4 },
+  appTitle: { fontSize: 34, fontWeight: '900', color: Colors.textPrimary, letterSpacing: -0.5 },
+  appSub: { fontSize: 14, color: Colors.textSecondary, marginTop: 4, fontWeight: '500' },
   tabs: {
-    flexDirection: 'row', backgroundColor: '#1A1A1A',
-    borderRadius: 14, padding: 4, marginBottom: 28
+    flexDirection: 'row', backgroundColor: Colors.grayLight,
+    borderRadius: 16, padding: 5, marginBottom: 32
   },
   tab: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    paddingVertical: 12, borderRadius: 10, gap: 6
+    paddingVertical: 12, borderRadius: 12, gap: 8
   },
-  tabActive: { backgroundColor: '#C0392B' },
-  tabText: { fontSize: 14, color: '#888', fontWeight: '600' },
-  tabTextActive: { color: '#fff' },
+  tabActive: { backgroundColor: Colors.danger, shadowColor: Colors.danger, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
+  tabText: { fontSize: 14, color: Colors.textSecondary, fontWeight: '700' },
+  tabTextActive: { color: Colors.white },
   form: {},
   inputWrap: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#1A1A1A', borderRadius: 12,
-    borderWidth: 1, borderColor: '#2A2A2A',
-    marginBottom: 14, paddingHorizontal: 14,
+    backgroundColor: Colors.white, borderRadius: 16,
+    borderWidth: 1.5, borderColor: Colors.grayLight,
+    marginBottom: 16, paddingHorizontal: 16,
+    height: 60,
   },
-  inputIcon: { marginRight: 10 },
-  input: { flex: 1, color: '#fff', fontSize: 16, paddingVertical: 14 },
-  eyeBtn: { padding: 4 },
-  driverHint: { fontSize: 12, color: '#666', textAlign: 'center', marginBottom: 8, marginTop: -4 },
+  inputIcon: { marginRight: 12 },
+  input: { flex: 1, color: Colors.textPrimary, fontSize: 16, fontWeight: '500' },
+  eyeBtn: { padding: 8 },
+  driverHint: { fontSize: 13, color: Colors.textSecondary, textAlign: 'center', marginBottom: 12, marginTop: -4, fontWeight: '500' },
   loginBtn: {
-    backgroundColor: '#C0392B', borderRadius: 12,
-    paddingVertical: 16, alignItems: 'center', marginTop: 8,
-    shadowColor: '#C0392B', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 6
+    backgroundColor: Colors.danger, borderRadius: 16,
+    paddingVertical: 18, alignItems: 'center', marginTop: 12,
+    shadowColor: Colors.danger, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 15, elevation: 8
   },
-  loginBtnText: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  registerLink: { alignItems: 'center', marginTop: 20 },
-  registerLinkText: { color: '#888', fontSize: 14 },
-  registerLinkBold: { color: '#C0392B', fontWeight: '700' },
+  loginBtnText: { color: Colors.white, fontSize: 18, fontWeight: '800', letterSpacing: 0.5 },
+  registerLink: { alignItems: 'center', marginTop: 24 },
+  registerLinkText: { color: Colors.textSecondary, fontSize: 14, fontWeight: '500' },
+  registerLinkBold: { color: Colors.danger, fontWeight: '800' },
 });
+

@@ -9,6 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAuth } from '../../context/AuthContext';
 import profileService from '../../services/profileService';
+import { Colors } from '../../constants/colors';
 
 export function UserProfileScreen() {
   const { logout } = useAuth();
@@ -71,7 +72,6 @@ export function UserProfileScreen() {
       const msg = err.response?.data?.message || 'Failed to update profile';
       Alert.alert('Error', msg);
     } finally {
-
       setSaving(false);
     }
   };
@@ -79,72 +79,72 @@ export function UserProfileScreen() {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#C0392B" />
+        <ActivityIndicator size="large" color={Colors.danger} />
       </View>
     );
   }
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor="#0D0D0D" />
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
       >
-        <ScrollView contentContainerStyle={styles.scroll}>
+        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.avatarContainer}>
-              <Icon name="account-circle" size={80} color="#C0392B" />
+              <Icon name="account" size={64} color={Colors.white} />
             </View>
             <Text style={styles.profileName}>{profile?.name}</Text>
-            <Text style={styles.profilePhone}>{profile?.phone}</Text>
+            <Text style={styles.profilePhone}>UID: {profile?.phone}</Text>
           </View>
 
           {/* Action Row */}
           <View style={styles.actionRow}>
             <TouchableOpacity 
-              style={[styles.actionBtn, isEditing && styles.saveBtn]} 
+              style={[styles.actionBtn, isEditing ? styles.saveBtn : styles.editBtn]} 
               onPress={() => isEditing ? handleSave() : setIsEditing(true)}
               disabled={saving}
             >
-              <Icon name={isEditing ? "check" : "pencil"} size={20} color="#fff" />
-              <Text style={styles.actionBtnText}>{saving ? 'Saving...' : isEditing ? 'Save Changes' : 'Edit Profile'}</Text>
+              <Icon name={isEditing ? "check-all" : "account-edit-outline"} size={22} color={Colors.white} />
+              <Text style={styles.actionBtnText}>{saving ? 'Updating...' : isEditing ? 'Save Changes' : 'Update Profile'}</Text>
             </TouchableOpacity>
             {isEditing && (
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setIsEditing(false)}>
-                <Text style={styles.cancelBtnText}>Cancel</Text>
+                 <Icon name="close" size={20} color={Colors.textSecondary} />
               </TouchableOpacity>
             )}
           </View>
 
           {/* Form Sections */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Personal Information</Text>
+            <Text style={styles.sectionTitle}>General Information</Text>
             <View style={styles.card}>
-              <InputGroup label="Full Name" value={name} onChangeText={setName} editable={isEditing} icon="account" />
-              <InputGroup label="Email Address" value={email} onChangeText={setEmail} editable={isEditing} icon="email" />
-              <InputGroup label="Blood Group" value={bloodGroup} onChangeText={setBloodGroup} editable={isEditing} icon="water" placeholder="e.g. O+" />
-              <InputGroup label="Address" value={address} onChangeText={setAddress} editable={isEditing} icon="map-marker" multiline />
+              <InputGroup label="Full Name" value={name} onChangeText={setName} editable={isEditing} icon="account-outline" />
+              <InputGroup label="Email ID" value={email} onChangeText={setEmail} editable={isEditing} icon="email-outline" />
+              <InputGroup label="Blood Type" value={bloodGroup} onChangeText={setBloodGroup} editable={isEditing} icon="water-outline" placeholder="A+, B+, etc." />
+              <InputGroup label="Residential Area" value={address} onChangeText={setAddress} editable={isEditing} icon="map-marker-outline" multiline />
             </View>
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Emergency Contact</Text>
+            <Text style={styles.sectionTitle}>Emergency Dispatch Detail</Text>
             <View style={styles.card}>
-              <InputGroup label="Contact Person" value={eName} onChangeText={setEName} editable={isEditing} icon="account-alert" />
-              <InputGroup label="Contact Phone" value={ePhone} onChangeText={setEPhone} editable={isEditing} icon="phone" keyboardType="phone-pad" />
-              <InputGroup label="Relation" value={eRelation} onChangeText={setERelation} editable={isEditing} icon="account-heart" />
+              <InputGroup label="Primary Guardian" value={eName} onChangeText={setEName} editable={isEditing} icon="shield-check-outline" />
+              <InputGroup label="Guardian Phone" value={ePhone} onChangeText={setEPhone} editable={isEditing} icon="phone-outline" keyboardType="phone-pad" />
+              <InputGroup label="Relation" value={eRelation} onChangeText={setERelation} editable={isEditing} icon="account-supervisor-outline" />
             </View>
           </View>
 
           {/* Logout Button */}
           <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
-            <Icon name="logout" size={20} color="#C0392B" />
-            <Text style={styles.logoutText}>Sign Out from MedFlow</Text>
+            <Icon name="logout-variant" size={22} color={Colors.danger} />
+            <Text style={styles.logoutText}>Disconnect Account</Text>
           </TouchableOpacity>
           
-          <Text style={styles.version}>Version 1.0.2 · Powered by MedFlow</Text>
+          <Text style={styles.version}>Version 1.2.0 • Secured by MedFlow</Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -156,14 +156,14 @@ function InputGroup({ label, value, onChangeText, editable, icon, placeholder, k
     <View style={styles.inputGroup}>
       <Text style={styles.label}>{label}</Text>
       <View style={[styles.inputContainer, !editable && styles.disabledInput]}>
-        <Icon name={icon} size={20} color={editable ? "#C0392B" : "#555"} style={styles.inputIcon} />
+        <Icon name={icon} size={20} color={editable ? Colors.danger : Colors.textTertiary} style={styles.inputIcon} />
         <TextInput
-          style={[styles.input, multiline && { height: 60, textAlignVertical: 'top' }]}
+          style={[styles.input, multiline && { height: 70, textAlignVertical: 'top', paddingTop: 12 }]}
           value={value}
           onChangeText={onChangeText}
           editable={editable}
           placeholder={placeholder || `Enter ${label.toLowerCase()}`}
-          placeholderTextColor="#444"
+          placeholderTextColor={Colors.textTertiary}
           keyboardType={keyboardType}
           multiline={multiline}
         />
@@ -173,44 +173,65 @@ function InputGroup({ label, value, onChangeText, editable, icon, placeholder, k
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#0D0D0D' },
-  scroll: { padding: 20, paddingBottom: 40 },
-  centered: { flex: 1, backgroundColor: '#0D0D0D', justifyContent: 'center', alignItems: 'center' },
-  header: { alignItems: 'center', marginBottom: 24, marginTop: 10 },
+  safe: { flex: 1, backgroundColor: Colors.white },
+  scroll: { paddingHorizontal: 24, paddingBottom: 40, paddingTop: 20 },
+  centered: { flex: 1, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
+  header: { alignItems: 'center', marginBottom: 32 },
   avatarContainer: {
     width: 100, height: 100, borderRadius: 50,
-    backgroundColor: '#1A1A1A', justifyContent: 'center',
-    alignItems: 'center', marginBottom: 12, elevation: 5
+    backgroundColor: Colors.danger, justifyContent: 'center',
+    alignItems: 'center', marginBottom: 16,
+    shadowColor: Colors.danger, shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25, shadowRadius: 15, elevation: 8
   },
-  profileName: { fontSize: 24, fontWeight: '800', color: '#fff' },
-  profilePhone: { fontSize: 14, color: '#888', marginTop: 4 },
-  actionRow: { flexDirection: 'row', gap: 10, marginBottom: 25 },
+  profileName: { fontSize: 28, fontWeight: '900', color: Colors.textPrimary, letterSpacing: -0.5 },
+  profilePhone: { fontSize: 13, color: Colors.textSecondary, marginTop: 4, fontWeight: '700', textTransform: 'uppercase' },
+  
+  actionRow: { flexDirection: 'row', gap: 12, marginBottom: 32 },
   actionBtn: {
-    flex: 1, flexDirection: 'row', backgroundColor: '#2A2A2A',
-    borderRadius: 12, paddingVertical: 12, justifyContent: 'center',
-    alignItems: 'center', gap: 8
+    flex: 1, flexDirection: 'row',
+    borderRadius: 16, paddingVertical: 16, justifyContent: 'center',
+    alignItems: 'center', gap: 10
   },
-  saveBtn: { backgroundColor: '#27AE60' },
-  actionBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  cancelBtn: { backgroundColor: '#333', borderRadius: 12, paddingHorizontal: 20, justifyContent: 'center' },
-  cancelBtnText: { color: '#888', fontWeight: '600' },
-  section: { marginBottom: 24 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#888', marginBottom: 12, marginLeft: 4 },
-  card: { backgroundColor: '#1A1A1A', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#2A2A2A' },
-  inputGroup: { marginBottom: 16 },
-  label: { fontSize: 12, color: '#555', fontWeight: '700', marginBottom: 6, marginLeft: 2 },
+  editBtn: { backgroundColor: Colors.info, shadowColor: Colors.info, shadowOpacity: 0.2, shadowRadius: 10, elevation: 4 },
+  saveBtn: { backgroundColor: Colors.success, shadowColor: Colors.success, shadowOpacity: 0.2, shadowRadius: 10, elevation: 4 },
+  actionBtnText: { color: Colors.white, fontWeight: '800', fontSize: 16 },
+  
+  cancelBtn: { 
+    width: 56, backgroundColor: Colors.grayLight, 
+    borderRadius: 16, justifyContent: 'center',
+    alignItems: 'center'
+  },
+  
+  section: { marginBottom: 32 },
+  sectionTitle: { 
+    fontSize: 13, color: Colors.textTertiary, fontWeight: '800', 
+    marginBottom: 16, marginLeft: 4, textTransform: 'uppercase', letterSpacing: 1.2
+  },
+  card: { 
+    backgroundColor: Colors.white, borderRadius: 24, 
+    padding: 20, borderWidth: 1, borderColor: Colors.grayLight,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 12, elevation: 2
+  },
+  
+  inputGroup: { marginBottom: 20 },
+  label: { fontSize: 12, color: Colors.textSecondary, fontWeight: '800', marginBottom: 8, marginLeft: 4 },
   inputContainer: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#0D0D0D', borderRadius: 10,
-    borderWidth: 1, borderColor: '#2A2A2A', paddingHorizontal: 12
+    backgroundColor: Colors.grayLight, borderRadius: 16,
+    borderWidth: 1.5, borderColor: Colors.grayLight, paddingHorizontal: 16
   },
-  disabledInput: { opacity: 0.6, backgroundColor: '#000' },
-  inputIcon: { marginRight: 10 },
-  input: { flex: 1, color: '#fff', fontSize: 15, height: 45 },
+  disabledInput: { opacity: 0.7, backgroundColor: Colors.grayLight, borderColor: Colors.grayLight },
+  inputIcon: { marginRight: 12 },
+  input: { flex: 1, color: Colors.textPrimary, fontSize: 15, height: 52, fontWeight: '600' },
+  
   logoutBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 10, paddingVertical: 16, marginTop: 10
+    gap: 12, paddingVertical: 18, marginTop: 8,
+    backgroundColor: Colors.dangerLight, borderRadius: 18,
+    borderWidth: 1.5, borderColor: 'rgba(211, 47, 47, 0.1)'
   },
-  logoutText: { color: '#C0392B', fontWeight: '700', fontSize: 16 },
-  version: { textAlign: 'center', color: '#333', fontSize: 12, marginTop: 20 }
+  logoutText: { color: Colors.danger, fontWeight: '900', fontSize: 15, textTransform: 'uppercase', letterSpacing: 0.5 },
+  version: { textAlign: 'center', color: Colors.textTertiary, fontSize: 12, marginTop: 32, fontWeight: '700' }
 });
+

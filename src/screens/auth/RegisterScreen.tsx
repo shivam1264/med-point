@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAuth } from '../../context/AuthContext';
+import { Colors } from '../../constants/colors';
 
 export function RegisterScreen({ navigation }: any) {
   const { registerUser } = useAuth();
@@ -42,63 +43,63 @@ export function RegisterScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor="#0D0D0D" />
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.kav}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-            <Icon name="arrow-left" size={24} color="#fff" />
+            <Icon name="arrow-left" size={26} color={Colors.textPrimary} />
           </TouchableOpacity>
 
           <View style={styles.header}>
             <View style={styles.logoIcon}>
-              <Icon name="account-plus" size={32} color="#fff" />
+              <Icon name="account-plus" size={36} color={Colors.white} />
             </View>
-            <Text style={styles.title}>Create Account</Text>
-            <Text style={styles.sub}>Register as a patient to use SOS and find hospitals</Text>
+            <Text style={styles.title}>New Entry</Text>
+            <Text style={styles.sub}>Register to access emergency services</Text>
           </View>
 
           <View style={styles.form}>
             <View style={styles.inputWrap}>
-              <Icon name="account" size={20} color="#C0392B" style={styles.inputIcon} />
+              <Icon name="account" size={20} color={Colors.danger} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Full Name"
-                placeholderTextColor="#555"
+                placeholderTextColor={Colors.textTertiary}
                 value={name}
                 onChangeText={setName}
               />
             </View>
             <View style={styles.inputWrap}>
-              <Icon name="phone" size={20} color="#C0392B" style={styles.inputIcon} />
+              <Icon name="phone" size={20} color={Colors.danger} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Mobile Number"
-                placeholderTextColor="#555"
+                placeholderTextColor={Colors.textTertiary}
                 value={phone}
                 onChangeText={setPhone}
                 keyboardType="phone-pad"
               />
             </View>
             <View style={styles.inputWrap}>
-              <Icon name="lock" size={20} color="#C0392B" style={styles.inputIcon} />
+              <Icon name="lock" size={20} color={Colors.danger} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Password"
-                placeholderTextColor="#555"
+                placeholderTextColor={Colors.textTertiary}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPass}
               />
               <TouchableOpacity onPress={() => setShowPass(!showPass)} style={styles.eyeBtn}>
-                <Icon name={showPass ? 'eye-off' : 'eye'} size={20} color="#555" />
+                <Icon name={showPass ? 'eye-off' : 'eye'} size={20} color={Colors.gray} />
               </TouchableOpacity>
             </View>
             <View style={styles.inputWrap}>
-              <Icon name="lock-check" size={20} color="#C0392B" style={styles.inputIcon} />
+              <Icon name="lock-check" size={20} color={Colors.danger} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Confirm Password"
-                placeholderTextColor="#555"
+                placeholderTextColor={Colors.textTertiary}
                 value={confirmPass}
                 onChangeText={setConfirmPass}
                 secureTextEntry={!showPass}
@@ -106,12 +107,12 @@ export function RegisterScreen({ navigation }: any) {
             </View>
 
             <TouchableOpacity style={styles.registerBtn} onPress={handleRegister} disabled={loading}>
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.registerBtnText}>Register</Text>}
+              {loading ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.registerBtnText}>Join MedFlow</Text>}
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.loginLink} onPress={() => navigation.goBack()}>
               <Text style={styles.loginLinkText}>
-                Already registered? <Text style={styles.loginLinkBold}>Login</Text>
+                Already have an account? <Text style={styles.loginLinkBold}>Login</Text>
               </Text>
             </TouchableOpacity>
           </View>
@@ -122,34 +123,41 @@ export function RegisterScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#0D0D0D' },
+  safe: { flex: 1, backgroundColor: Colors.white },
   kav: { flex: 1 },
-  scroll: { flexGrow: 1, paddingHorizontal: 24, paddingVertical: 40 },
-  backBtn: { marginBottom: 20 },
+  scroll: { flexGrow: 1, paddingHorizontal: 28, paddingVertical: 40 },
+  backBtn: { 
+    width: 44, height: 44, borderRadius: 12, 
+    backgroundColor: Colors.grayLight, alignItems: 'center', 
+    justifyContent: 'center', marginBottom: 24 
+  },
   header: { alignItems: 'center', marginBottom: 32 },
   logoIcon: {
-    width: 64, height: 64, borderRadius: 18, backgroundColor: '#C0392B',
-    alignItems: 'center', justifyContent: 'center', marginBottom: 12,
+    width: 72, height: 72, borderRadius: 20, backgroundColor: Colors.danger,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 16,
+    shadowColor: Colors.danger, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 10, elevation: 4
   },
-  title: { fontSize: 28, fontWeight: '800', color: '#fff' },
-  sub: { fontSize: 13, color: '#888', marginTop: 6, textAlign: 'center' },
+  title: { fontSize: 30, fontWeight: '900', color: Colors.textPrimary, letterSpacing: -0.5 },
+  sub: { fontSize: 14, color: Colors.textSecondary, marginTop: 4, textAlign: 'center', fontWeight: '500' },
   form: {},
   inputWrap: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#1A1A1A', borderRadius: 12,
-    borderWidth: 1, borderColor: '#2A2A2A',
-    marginBottom: 14, paddingHorizontal: 14,
+    backgroundColor: Colors.white, borderRadius: 16,
+    borderWidth: 1.5, borderColor: Colors.grayLight,
+    marginBottom: 16, paddingHorizontal: 16,
+    height: 60,
   },
-  inputIcon: { marginRight: 10 },
-  input: { flex: 1, color: '#fff', fontSize: 16, paddingVertical: 14 },
-  eyeBtn: { padding: 4 },
+  inputIcon: { marginRight: 12 },
+  input: { flex: 1, color: Colors.textPrimary, fontSize: 16, fontWeight: '500' },
+  eyeBtn: { padding: 8 },
   registerBtn: {
-    backgroundColor: '#C0392B', borderRadius: 12,
-    paddingVertical: 16, alignItems: 'center', marginTop: 8,
-    elevation: 6,
+    backgroundColor: Colors.danger, borderRadius: 16,
+    paddingVertical: 18, alignItems: 'center', marginTop: 12,
+    shadowColor: Colors.danger, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 15, elevation: 8
   },
-  registerBtnText: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  loginLink: { alignItems: 'center', marginTop: 20 },
-  loginLinkText: { color: '#888', fontSize: 14 },
-  loginLinkBold: { color: '#C0392B', fontWeight: '700' },
+  registerBtnText: { color: Colors.white, fontSize: 18, fontWeight: '800', letterSpacing: 0.5 },
+  loginLink: { alignItems: 'center', marginTop: 24 },
+  loginLinkText: { color: Colors.textSecondary, fontSize: 14, fontWeight: '500' },
+  loginLinkBold: { color: Colors.danger, fontWeight: '800' },
 });
+

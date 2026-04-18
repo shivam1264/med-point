@@ -30,13 +30,18 @@ export function MetricCard({
 const styles = StyleSheet.create({
   card: {
     flex: 1,
-    backgroundColor: Colors.grayLight,
-    borderRadius: 12,
-    borderWidth: 0.5,
-    borderColor: Colors.border,
-    padding: 12,
+    backgroundColor: Colors.white,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: Colors.grayLight,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.02,
+    shadowRadius: 10,
     elevation: 2,
   },
-  label: { ...Typography.small, color: Colors.textSecondary },
-  value: { ...Typography.h1, marginTop: 4 },
+  label: { ...Typography.small, color: Colors.textTertiary, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  value: { ...Typography.h1, marginTop: 4, fontWeight: '900' },
 });
+

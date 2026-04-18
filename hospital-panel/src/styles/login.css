@@ -1,34 +1,151 @@
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-/* hospital select styles */
-.hospital-select { width: 100%; background: #252525; border: 1px solid #2A2A2A; border-radius: 10px; color: #EAEAEA; font-family: inherit; font-size: 15px; padding: 12px 14px; outline: none; transition: border-color .2s; cursor: pointer; }
-.hospital-select:focus { border-color: #C0392B; }
-.hospital-select option { background: #252525; }
-.selected-badge { margin-top: 6px; font-size: 12px; color: #27AE60; font-weight: 600; }
-.dropdown-loading { padding: 12px 0; color: #888; font-size: 14px; }
-.login-hint code { background: #2A2A2A; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
-
-:root {
-  --red: #C0392B; --red-dk: #96281B;
-  --green: #27AE60; --amber: #F39C12; --blue: #378ADD;
-  --bg: #0D0D0D; --bg2: #1A1A1A; --bg3: #252525;
-  --border: #2A2A2A; --text: #EAEAEA; --sub: #888;
+.login-page { 
+  min-height: 100vh; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  background-color: #F8F9FA;
+  background-image: radial-gradient(at 0% 0%, rgba(25, 118, 210, 0.05) 0, transparent 50%), 
+                    radial-gradient(at 100% 100%, rgba(211, 47, 47, 0.05) 0, transparent 50%);
 }
 
-body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+.login-card { 
+  background: #FFFFFF; 
+  border: 1px solid var(--border); 
+  border-radius: 24px; 
+  padding: 48px; 
+  width: 100%; 
+  max-width: 440px; 
+  box-shadow: 0 20px 50px rgba(0,0,0,0.05);
+  text-align: center; 
+}
 
-/* ── Login ─── */
-.login-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: radial-gradient(ellipse at center, #1A0808 0%, #0D0D0D 70%); }
-.login-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 20px; padding: 44px 40px; width: 100%; max-width: 420px; box-shadow: 0 24px 60px rgba(192,57,43,.15); text-align: center; }
-.login-icon { font-size: 48px; margin-bottom: 12px; }
-.login-title { font-size: 30px; font-weight: 800; margin-bottom: 4px; }
-.login-sub { color: var(--sub); font-size: 14px; margin-bottom: 32px; }
-.login-form .field { text-align: left; margin-bottom: 16px; }
-.login-form label { display: block; font-size: 11px; font-weight: 700; color: var(--sub); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
-.login-form input { width: 100%; background: var(--bg3); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-size: 15px; padding: 12px 14px; outline: none; transition: border-color .2s; font-family: inherit; }
-.login-form input:focus { border-color: var(--red); }
-.login-btn { width: 100%; margin-top: 8px; padding: 13px; background: var(--red); color: #fff; border: none; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; transition: background .2s; font-family: inherit; }
-.login-btn:hover { background: var(--red-dk); }
-.login-btn:disabled { opacity: .6; cursor: not-allowed; }
-.login-hint { font-size: 12px; color: #555; margin-top: 16px; }
-.error-msg { color: var(--red); font-size: 13px; margin-top: 8px; padding: 8px 12px; background: #2A0A0A; border-radius: 8px; }
+.logo-wrapper {
+  width: 64px;
+  height: 64px;
+  background: var(--primary);
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 24px;
+  box-shadow: 0 8px 16px rgba(25, 118, 210, 0.2);
+}
+
+.login-title { 
+  font-size: 32px; 
+  font-weight: 900; 
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
+  margin-bottom: 8px; 
+}
+
+.login-sub { 
+  color: var(--text-secondary); 
+  font-size: 15px; 
+  font-weight: 500;
+  margin-bottom: 40px; 
+}
+
+.login-form .field { 
+  text-align: left; 
+  margin-bottom: 24px; 
+}
+
+.login-form label { 
+  display: block; 
+  font-size: 12px; 
+  font-weight: 700; 
+  color: var(--text-secondary); 
+  text-transform: uppercase; 
+  letter-spacing: 0.5px; 
+  margin-bottom: 8px; 
+}
+
+.hospital-select { 
+  width: 100%; 
+  background: #F9FAFB; 
+  border: 1px solid var(--border); 
+  border-radius: 12px; 
+  color: var(--text-primary); 
+  font-family: inherit; 
+  font-size: 15px; 
+  padding: 14px; 
+  outline: none; 
+  transition: var(--transition); 
+  cursor: pointer; 
+}
+
+.hospital-select:focus { 
+  border-color: var(--primary); 
+  background-color: #FFFFFF;
+  box-shadow: 0 0 0 4px rgba(25, 118, 210, 0.05);
+}
+
+.login-form input { 
+  width: 100%; 
+  background: #F9FAFB; 
+  border: 1px solid var(--border); 
+  border-radius: 12px; 
+  color: var(--text-primary); 
+  font-size: 15px; 
+  padding: 14px; 
+  outline: none; 
+  transition: var(--transition); 
+  font-family: inherit; 
+}
+
+.login-form input:focus { 
+  border-color: var(--primary); 
+  background-color: #FFFFFF;
+  box-shadow: 0 0 0 4px rgba(25, 118, 210, 0.05);
+}
+
+.login-btn { 
+  width: 100%; 
+  margin-top: 12px; 
+  padding: 16px; 
+  background: var(--primary); 
+  color: #fff; 
+  border: none; 
+  border-radius: 12px; 
+  font-size: 16px; 
+  font-weight: 700; 
+  cursor: pointer; 
+  transition: var(--transition); 
+}
+
+.login-btn:hover { 
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.login-btn:disabled { 
+  opacity: 0.5; 
+  cursor: not-allowed; 
+}
+
+.error-msg { 
+  background: var(--danger-light);
+  color: var(--danger); 
+  font-size: 13px; 
+  font-weight: 600;
+  margin-bottom: 24px; 
+  padding: 12px; 
+  border-radius: 10px; 
+  border: 1px solid rgba(211, 47, 47, 0.1);
+}
+
+.login-hint { 
+  font-size: 13px; 
+  color: var(--text-tertiary); 
+  margin-top: 24px; 
+  font-weight: 500;
+}
+
+.login-hint code {
+  background: #F1F5F9;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}

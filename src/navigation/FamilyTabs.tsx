@@ -18,16 +18,16 @@ export function FamilyTabs() {
         name="Home"
         component={HomeScreen}
         options={{
-          tabBarLabel: Labels.home,
-          tabBarIcon: ({ color, size }) => <Icon name="home" size={size} color={color} />,
+          tabBarLabel: 'Family',
+          tabBarIcon: ({ color, size }) => <Icon name="home-heart" size={size + 2} color={color} />,
         }}
       />
       <Tab.Screen
         name="Map"
         component={MapScreen}
         options={{
-          tabBarLabel: Labels.map,
-          tabBarIcon: ({ color, size }) => <Icon name="map-marker" size={size} color={color} />,
+          tabBarLabel: 'Locator',
+          tabBarIcon: ({ color, size }) => <Icon name="map-search" size={size + 2} color={color} />,
         }}
       />
       <Tab.Screen
@@ -35,17 +35,18 @@ export function FamilyTabs() {
         component={HospitalScreen}
         options={{
           tabBarLabel: 'Hospitals',
-          tabBarIcon: ({ color, size }) => <Icon name="hospital" size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <Icon name="hospital-marker" size={size + 2} color={color} />,
         }}
       />
       <Tab.Screen
         name="Settings"
         component={SettingsScreen}
         options={{
-          tabBarLabel: Labels.settings,
-          tabBarIcon: ({ color, size }) => <Icon name="cog" size={size} color={color} />,
+          tabBarLabel: 'Settings',
+          tabBarIcon: ({ color, size }) => <Icon name="cog-outline" size={size + 2} color={color} />,
         }}
       />
     </Tab.Navigator>
+
   );
 }

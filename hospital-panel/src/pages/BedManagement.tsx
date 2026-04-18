@@ -41,9 +41,8 @@ export default function BedManagement() {
           return;
         }
       }
-      throw new Error("Not found by ID");
+      throw new Error("Not found");
     } catch (e) {
-      // fallback: search in list by ID or by Name
       try {
         const res = await api.get(`/hospitals?limit=100`);
         const list = res.data.data || [];
@@ -74,75 +73,59 @@ export default function BedManagement() {
         ventilatorsAvailable: localData.vent,
         status: localData.status
       });
-      showToast('✅ Bed data updated successfully!');
-    } catch { showToast('❌ Save failed'); }
+      showToast('✅ Availability synced successfully');
+    } catch { showToast('❌ Synchronization failed'); }
     finally { setSaving(false); }
   };
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
-  if (loading) return <div className="page"><div className="loading">Loading your hospital data...</div></div>;
-  if (!hospital) return <div className="page"><div className="loading">Hospital not found.</div></div>;
+  if (loading) return <div className="page"><div className="loading">Retrieving inventory...</div></div>;
+  if (!hospital) return <div className="page"><div className="loading">Hospital record not found.</div></div>;
 
-  const beds: { field: 'icu' | 'general' | 'vent'; label: string; total: number }[] = [
-    { field: 'icu', label: 'ICU Beds Available', total: hospital.icuBeds },
-    { field: 'general', label: 'General Beds Available', total: hospital.totalBeds },
-    { field: 'vent', label: 'Ventilators Available', total: hospital.ventilators },
+  const beds: { field: 'icu' | 'general' | 'vent'; label: string; total: number; color: string }[] = [
+    { field: 'icu', label: 'ICU Beds', total: hospital.icuBeds, color: 'var(--primary)' },
+    { field: 'general', label: 'General Beds', total: hospital.totalBeds, color: 'var(--success)' },
+    { field: 'vent', label: 'Ventilators', total: hospital.ventilators, color: 'var(--warning)' },
   ];
-
-  const icuPct = hospital.icuBeds ? Math.round((localData.icu / hospital.icuBeds) * 100) : 0;
-  const generalPct = hospital.totalBeds ? Math.round((localData.general / hospital.totalBeds) * 100) : 0;
 
   return (
     <div className="page">
-      <h1 className="page-title">Bed Management</h1>
-      <p className="page-sub">Live bed availability for <strong style={{ color: '#EAEAEA' }}>{hospital.hospitalName}</strong></p>
-
-      {/* Hospital summary */}
-      <div className="hosp-summary-card">
-        <div className="hosp-summary-left">
-          <div className="hosp-summary-name">{hospital.hospitalName}</div>
-          <div className="hosp-summary-area">{hospital.area || hospital.address}</div>
-          <div className="hosp-progress-row">
-            <span className="hosp-progress-label">ICU {icuPct}% free</span>
-            <div className="hosp-progress-bar">
-              <div className="hosp-progress-fill" style={{ width: `${icuPct}%`, backgroundColor: icuPct > 50 ? '#27AE60' : icuPct > 20 ? '#F39C12' : '#C0392B' }} />
-            </div>
-          </div>
-          <div className="hosp-progress-row">
-            <span className="hosp-progress-label">General {generalPct}% free</span>
-            <div className="hosp-progress-bar">
-              <div className="hosp-progress-fill" style={{ width: `${generalPct}%`, backgroundColor: generalPct > 50 ? '#27AE60' : generalPct > 20 ? '#F39C12' : '#C0392B' }} />
-            </div>
-          </div>
+      <header className="page-header">
+        <div>
+          <h1 className="page-title">Resource Inventory</h1>
+          <p className="page-sub">Manage real-time availability for <strong>{hospital.hospitalName}</strong></p>
         </div>
         <div>
-          <label className="field-label">Overall Status</label>
-          <select className="status-select" value={localData.status} onChange={e => setLocalData(d => ({ ...d, status: e.target.value }))}>
-            <option value="green">🟢 Available</option>
-            <option value="amber">🟡 Moderate</option>
-            <option value="red">🔴 Critical</option>
+          <select 
+            className={`status-inline-select ${localData.status === 'green' ? 'badge-green' : localData.status === 'amber' ? 'badge-amber' : 'badge-red'}`} 
+            value={localData.status} 
+            onChange={e => setLocalData(d => ({ ...d, status: e.target.value }))}
+            style={{ padding: '10px 16px' }}
+          >
+            <option value="green">🟢 Critical: Normal</option>
+            <option value="amber">🟡 Critical: Moderate</option>
+            <option value="red">🔴 Critical: High</option>
           </select>
         </div>
-      </div>
+      </header>
 
-      {/* Bed counters */}
       <div className="bed-counters-grid">
         {beds.map(b => (
           <div className="bed-counter-card" key={b.field}>
             <div className="bed-label">{b.label}</div>
-            <div className="bed-total-note">Total capacity: {b.total}</div>
+            <div className="bed-total-note">Capacity: {b.total || '—'}</div>
             <div className="bed-counter">
               <button className="counter-btn" onClick={() => change(b.field, -1)}>−</button>
               <span className="counter-val">{localData[b.field]}</span>
               <button className="counter-btn" onClick={() => change(b.field, 1)}>+</button>
             </div>
-            <div className="bed-pct-bar">
+            <div className="bed-pct-bar" style={{ marginTop: '24px' }}>
               <div
                 className="bed-pct-fill"
                 style={{
-                  width: b.total ? `${Math.round((localData[b.field] / b.total) * 100)}%` : '0%',
-                  backgroundColor: '#C0392B'
+                  width: b.total ? `${Math.min(100, Math.round((localData[b.field] / b.total) * 100))}%` : '0%',
+                  backgroundColor: b.color
                 }}
               />
             </div>
@@ -150,9 +133,11 @@ export default function BedManagement() {
         ))}
       </div>
 
-      <button className="save-btn-big" onClick={save} disabled={saving}>
-        {saving ? 'Saving...' : '💾 Save Bed Data'}
-      </button>
+      <div style={{ marginTop: '32px' }}>
+        <button className="btn-primary" style={{ padding: '16px 40px', fontSize: '16px' }} onClick={save} disabled={saving}>
+          {saving ? 'Syncing...' : 'Update Inventory'}
+        </button>
+      </div>
 
       {toast && <div className="toast">{toast}</div>}
     </div>
