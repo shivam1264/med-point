@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useMemo, type ReactNode } from 'react';
 import axios from 'axios';
 
-export const API_BASE = 'http://localhost:5000/api';
+export const API_BASE = 'https://med-point.onrender.com/api';
 
 export const api = axios.create({ baseURL: API_BASE });
 

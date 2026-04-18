@@ -5,10 +5,10 @@
 
 // Use your PC's WiFi IP (e.g. 192.168.1.X) for physical devices
 // Use 10.0.2.2 for Android Emulator
-const DEV_IP = 'localhost'; // Or '10.0.2.2' for Emulator
+const DEV_IP = 'med-point.onrender.com';
 
-export const BASE_URL = `http://${DEV_IP}:5000/api`;
-export const SOCKET_URL = `http://${DEV_IP}:5000`;
+export const BASE_URL = `https://${DEV_IP}/api`;
+export const SOCKET_URL = `https://${DEV_IP}`;
 
 export const CONFIG = {
   APP_NAME: 'MedFlow',

@@ -178,28 +178,35 @@ const updateProfile = async (req, res) => {
   try {
     const { id, role } = req.user;
     const updates = req.body;
+    
+    console.log(`Profile Update Request for ${role} ID: ${id}`);
+    console.log('Update Payload:', JSON.stringify(updates, null, 2));
 
     // Prevent role/password updates through this endpoint for safety
-    delete updates.role;
-    delete updates.password;
-    delete updates.driverId; // Ambulance specific
-    delete updates.hospital; // Ambulance specific
+    if (updates.role) delete updates.role;
+    if (updates.password) delete updates.password;
+    if (updates.driverId) delete updates.driverId;
+    if (updates.hospital) delete updates.hospital;
 
     let updated;
     if (role === 'user') {
       updated = await User.findByIdAndUpdate(id, updates, { new: true, runValidators: true }).select('-password');
     } else if (role === 'ambulance') {
-      // Drivers can only update personal info, not vehicle/hospital info
-      const allowed = { 
-        driverName: updates.driverName, 
-        driverPhone: updates.driverPhone 
-      };
+      const allowed = {};
+      if (updates.driverName) allowed.driverName = updates.driverName;
+      if (updates.driverPhone) allowed.driverPhone = updates.driverPhone;
       updated = await Ambulance.findByIdAndUpdate(id, allowed, { new: true, runValidators: true }).select('-password');
     }
 
-    if (!updated) return res.status(404).json({ success: false, message: 'Profile not found' });
+    if (!updated) {
+      console.warn('Update failed: Profile not found');
+      return res.status(404).json({ success: false, message: 'Profile not found' });
+    }
+    
+    console.log('Profile updated successfully');
     res.json({ success: true, message: 'Profile updated successfully', data: updated });
   } catch (err) {
+    console.error('Profile Update Error:', err.message);
     res.status(500).json({ success: false, message: err.message });
   }
 };

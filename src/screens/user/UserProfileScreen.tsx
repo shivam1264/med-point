@@ -55,7 +55,7 @@ export function UserProfileScreen() {
       const updates = {
         name,
         email,
-        bloodGroup,
+        bloodGroup: bloodGroup.toUpperCase().trim(),
         address,
         emergencyContact: {
           name: eName,
