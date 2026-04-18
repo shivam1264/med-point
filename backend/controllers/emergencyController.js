@@ -299,6 +299,10 @@ const completeEmergency = async (req, res) => {
     emergency.completedAt = new Date();
     await emergency.save();
 
+    // Free up modern ambulance
+    if (emergency.ambulance) {
+      await Ambulance.findByIdAndUpdate(emergency.ambulance, { isAvailable: true });
+    }
 
     // Notify user via Socket.io
     if (req.io) {
@@ -310,6 +314,7 @@ const completeEmergency = async (req, res) => {
 
     res.json({ success: true, message: 'Emergency completed', data: emergency });
   } catch (err) {
+    console.error('Complete Emergency Error:', err.message);
     res.status(500).json({ success: false, message: err.message });
   }
 };

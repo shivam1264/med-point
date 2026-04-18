@@ -161,8 +161,9 @@ export function AmbulanceNavScreen({ route, navigation }: Props) {
       setLoading(true);
       await sosService.completeEmergency(emergency._id, otpInput);
       Alert.alert('✅ Success', 'Emergency completed!', [{ text: 'OK', onPress: () => navigation.navigate('AmbTabs') }]);
-    } catch (err) {
-      Alert.alert('Error', 'Could not complete emergency');
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Could not complete emergency';
+      Alert.alert('Error', msg);
     } finally {
       setLoading(false);
     }
