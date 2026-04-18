@@ -13,6 +13,7 @@ const hospitalRoutes = require('./routes/hospitals');
 const doctorRoutes = require('./routes/doctors');
 const ambulanceRoutes = require('./routes/ambulances');
 const emergencyRoutes = require('./routes/emergencies');
+const Ambulance = require('./models/Ambulance');
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -87,9 +88,18 @@ io.on('connection', (socket) => {
   });
 
   // Ambulance driver sends live location
-  socket.on('driver_location', ({ ambulanceId, lat, lng }) => {
-    // Broadcast to any dashboard listeners
+  socket.on('driver_location', async ({ ambulanceId, lat, lng }) => {
+    // Broadcast to any dashboard/user listeners
     io.emit('ambulance_location_update', { ambulanceId, lat, lng, timestamp: new Date() });
+
+    // Persist to DB for initial loads
+    try {
+      await Ambulance.findByIdAndUpdate(ambulanceId, {
+        location: { type: 'Point', coordinates: [lng, lat] }
+      });
+    } catch (err) {
+      console.error('Error updating ambulance location in DB:', err.message);
+    }
   });
 
   socket.on('disconnect', () => {

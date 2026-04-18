@@ -45,10 +45,13 @@ export function UserEmergencyTrackScreen({ route, navigation }: any) {
 
     socket.on('ambulance_location_update', (data: any) => {
       console.log('Location Update received for:', data.ambulanceId);
-      // Ensure we compare IDs correctly as strings
-      const currentAmbId = emergency?.ambulance?._id || emergency?.ambulance;
+      
+      // The emergency object might have ambulance as an ID string or a populated object
+      const ambulanceData = emergency?.ambulance;
+      const currentAmbId = typeof ambulanceData === 'string' ? ambulanceData : ambulanceData?._id;
+
       if (currentAmbId && currentAmbId.toString() === data.ambulanceId.toString()) {
-        console.log('Matching Ambulance! Updating markers...');
+        console.log('Matching Ambulance! Updating marker to:', data.lat, data.lng);
         setAmbLoc({ lat: data.lat, lng: data.lng });
       }
     });
