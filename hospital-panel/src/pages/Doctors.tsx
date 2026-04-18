@@ -8,7 +8,8 @@ interface Doctor {
   availableStatus: string; hospitalName: string; hospital: string;
 }
 
-const emptyForm = { name: '', specialty: '', qualification: '', experience: '', phone: '', consultationFee: '' };
+const emptyForm = { name: '', specialty: '', qualification: '', experience: '', phone: '', consultationFee: '', availableStatus: 'available' };
+
 
 export default function Doctors() {
   const { admin } = useAuth();
@@ -38,9 +39,18 @@ export default function Doctors() {
 
   const openAdd = () => { setForm(emptyForm); setEditId(null); setShowForm(true); };
   const openEdit = (d: Doctor) => {
-    setForm({ name: d.name, specialty: d.specialty, qualification: d.qualification || '', experience: String(d.experience || ''), phone: d.phone || '', consultationFee: String(d.consultationFee || '') });
+    setForm({ name: d.name, specialty: d.specialty, qualification: d.qualification || '', experience: String(d.experience || ''), phone: d.phone || '', consultationFee: String(d.consultationFee || ''), availableStatus: d.availableStatus || 'available' });
     setEditId(d._id); setShowForm(true);
   };
+
+  const updateStatus = async (id: string, newStatus: string) => {
+    try {
+      await api.patch(`/doctors/${id}/status`, { availableStatus: newStatus });
+      showToast('✅ Status updated');
+      loadDoctors();
+    } catch { showToast('❌ Failed to update status'); }
+  };
+
 
   const save = async () => {
     if (!form.name || !form.specialty) { showToast('❌ Name and specialty required'); return; }
@@ -95,7 +105,16 @@ export default function Doctors() {
             <div className="field"><label>Experience (yrs)</label><input type="number" placeholder="10" value={form.experience} onChange={e => setForm(f => ({ ...f, experience: e.target.value }))} /></div>
             <div className="field"><label>Phone</label><input placeholder="+91-98XXXXXXXX" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} /></div>
             <div className="field"><label>Consultation Fee (₹)</label><input type="number" placeholder="500" value={form.consultationFee} onChange={e => setForm(f => ({ ...f, consultationFee: e.target.value }))} /></div>
+            <div className="field">
+              <label>Current Status</label>
+              <select value={form.availableStatus} onChange={e => setForm(f => ({ ...f, availableStatus: e.target.value }))}>
+                <option value="available">Available</option>
+                <option value="busy">Busy</option>
+                <option value="off-duty">Off-duty</option>
+              </select>
+            </div>
           </div>
+
           <div className="form-note">🏥 Will be added to: <strong>{admin?.hospitalName}</strong></div>
           <div className="form-actions">
             <button className="btn-outline" onClick={() => setShowForm(false)}>Cancel</button>
@@ -120,7 +139,18 @@ export default function Doctors() {
                   <td>{d.qualification || '—'}</td>
                   <td>{d.experience ? d.experience + ' yrs' : '—'}</td>
                   <td>{d.consultationFee ? '₹' + d.consultationFee : '—'}</td>
-                  <td><span className={`badge ${statusBadge(d.availableStatus)}`}>{d.availableStatus}</span></td>
+                  <td>
+                    <select 
+                      className={`status-inline-select ${statusBadge(d.availableStatus)}`}
+                      value={d.availableStatus}
+                      onChange={(e) => updateStatus(d._id, e.target.value)}
+                    >
+                      <option value="available">Available</option>
+                      <option value="busy">Busy</option>
+                      <option value="off-duty">Off-duty</option>
+                    </select>
+                  </td>
+
                   <td>
                     <button className="btn-sm btn-outline" onClick={() => openEdit(d)}>Edit</button>{' '}
                     <button className="btn-sm btn-danger" onClick={() => del(d._id)}>Delete</button>

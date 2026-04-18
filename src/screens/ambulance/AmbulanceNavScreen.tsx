@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Linking, Modal, TextInput, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -7,7 +7,9 @@ import { io, Socket } from 'socket.io-client';
 import Geolocation from '@react-native-community/geolocation';
 import { useAuth } from '../../context/AuthContext';
 import mapService, { RoutePoint } from '../../services/mapService';
+import { SOCKET_URL } from '../../config';
 import type { Emergency } from '../../types';
+
 
 interface Props {
   route: { params: { emergency: Emergency } };
@@ -24,6 +26,9 @@ export function AmbulanceNavScreen({ route, navigation }: Props) {
   const [phase, setPhase] = React.useState<'PICKUP' | 'DROPOFF'>('PICKUP');
   const [driverLoc, setDriverLoc] = React.useState<RoutePoint | null>(null);
   const [lastUpdate, setLastUpdate] = React.useState<{ phase: string; loc: RoutePoint } | null>(null);
+  const [otpInput, setOtpInput] = React.useState('');
+  const [showOtpModal, setShowOtpModal] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
   
   const { driver } = useAuth();
   const socketRef = React.useRef<Socket | null>(null);
@@ -35,9 +40,10 @@ export function AmbulanceNavScreen({ route, navigation }: Props) {
   React.useEffect(() => {
     if (!driver?.id) return;
 
-    const socket = io('http://localhost:5000', {
+    const socket = io(SOCKET_URL, {
       transports: ['websocket']
     });
+
     socketRef.current = socket;
 
     socket.on('connect', () => {
@@ -144,6 +150,23 @@ export function AmbulanceNavScreen({ route, navigation }: Props) {
       );
     }
   }, [driverLoc === null, phase]); // Run when driverLoc first goes from null to something, or phase changes
+  
+  const handleComplete = async () => {
+    if (otpInput !== emergency.pickupOTP) {
+      Alert.alert('Invalid OTP', 'Ask patient for the correct code.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await sosService.completeEmergency(emergency._id, otpInput);
+      Alert.alert('✅ Success', 'Emergency completed!', [{ text: 'OK', onPress: () => navigation.navigate('AmbTabs') }]);
+    } catch (err) {
+      Alert.alert('Error', 'Could not complete emergency');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -207,6 +230,37 @@ export function AmbulanceNavScreen({ route, navigation }: Props) {
         )}
       </MapView>
 
+      {/* OTP Modal */}
+      <Modal transparent visible={showOtpModal} animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.otpModalCard}>
+            <Text style={styles.otpModalTitle}>Verify Patient OTP</Text>
+            <Text style={styles.otpModalSub}>Ask patient for the code to complete trip.</Text>
+            <TextInput
+              style={styles.otpInput}
+              placeholder="0000"
+              placeholderTextColor="#444"
+              keyboardType="number-pad"
+              maxLength={4}
+              value={otpInput}
+              onChangeText={setOtpInput}
+              autoFocus
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.declineBtn} onPress={() => { setShowOtpModal(false); setOtpInput(''); }}>
+                <Text style={styles.declineBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.acceptBtn, { backgroundColor: '#27AE60' }]}
+                disabled={loading}
+                onPress={() => { setShowOtpModal(false); handleComplete(); }}>
+                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.acceptBtnText}>Complete</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <View style={styles.infoCard}>
         <View style={styles.phase}>
           <View style={[styles.phaseStep, phase === 'PICKUP' ? styles.phaseActive : styles.phaseDone]}>
@@ -220,17 +274,26 @@ export function AmbulanceNavScreen({ route, navigation }: Props) {
           <Text style={[styles.phaseLabel, phase === 'DROPOFF' && styles.activeText]}>To Hospital</Text>
         </View>
 
-        <TouchableOpacity 
-          style={styles.actionBtn} 
-          onPress={() => {
-            if (phase === 'PICKUP') setPhase('DROPOFF');
-            else navigation.goBack(); // Or complete emergency
-          }}
-        >
-          <Text style={styles.actionBtnText}>
-            {phase === 'PICKUP' ? 'ARRIVED AT PATIENT' : 'ARRIVED AT HOSPITAL'}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.actionRow}>
+          <TouchableOpacity 
+            style={styles.actionBtn} 
+            onPress={() => {
+              if (phase === 'PICKUP') setPhase('DROPOFF');
+              else setShowOtpModal(true);
+            }}
+          >
+            <Text style={styles.actionBtnText}>
+              {phase === 'PICKUP' ? 'ARRIVED AT PATIENT' : 'ARRIVED AT HOSPITAL'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.callSmallBtn} 
+            onPress={() => emergency.userPhone && Linking.openURL(`tel:${emergency.userPhone}`)}
+          >
+            <Icon name="phone" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.divider} />
 
@@ -265,7 +328,13 @@ const styles = StyleSheet.create({
   activeText: { color: '#fff', fontWeight: '600' },
   phaseLine: { flex: 1, height: 2, backgroundColor: '#2A2A2A' },
   lineActive: { backgroundColor: '#C0392B' },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 20,
+  },
   actionBtn: {
+    flex: 1,
     backgroundColor: '#C0392B',
     paddingVertical: 14,
     borderRadius: 12,
@@ -278,7 +347,37 @@ const styles = StyleSheet.create({
     elevation: 6
   },
   actionBtnText: { color: '#fff', fontSize: 15, fontWeight: '700', letterSpacing: 1 },
+  callSmallBtn: {
+    width: 50,
+    backgroundColor: '#E67E22',
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 6
+  },
   divider: { height: 1, backgroundColor: '#2A2A2A', marginBottom: 20 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   rowText: { flex: 1, fontSize: 13, color: '#ccc' },
+  // Modal Styles
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center' },
+  otpModalCard: {
+    backgroundColor: '#1A1A1A', borderRadius: 24, padding: 24, width: '85%',
+    borderWidth: 1, borderColor: '#333', alignSelf: 'center'
+  },
+  otpModalTitle: { fontSize: 20, fontWeight: '800', color: '#fff', textAlign: 'center', marginBottom: 8 },
+  otpModalSub: { fontSize: 13, color: '#888', textAlign: 'center', marginBottom: 24 },
+  otpInput: {
+    backgroundColor: '#0D0D0D', borderRadius: 12, height: 60,
+    fontSize: 28, fontWeight: '800', color: '#fff', textAlign: 'center',
+    letterSpacing: 10, marginBottom: 24, borderWidth: 1, borderColor: '#333'
+  },
+  modalActions: { flexDirection: 'row', gap: 12 },
+  declineBtn: { flex: 1, backgroundColor: '#2A2A2A', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  declineBtnText: { color: '#888', fontWeight: '700', fontSize: 16 },
+  acceptBtn: { flex: 2, backgroundColor: '#C0392B', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  acceptBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
 });

@@ -36,8 +36,8 @@ export const sosService = {
     await apiClient.patch(`/emergencies/${id}/decline`);
   },
 
-  async completeEmergency(id: string): Promise<Emergency> {
-    const res = await apiClient.patch(`/emergencies/${id}/complete`);
+  async completeEmergency(id: string, otp: string): Promise<Emergency> {
+    const res = await apiClient.patch(`/emergencies/${id}/complete`, { otp });
     return res.data.data;
   },
 

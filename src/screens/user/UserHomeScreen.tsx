@@ -10,6 +10,8 @@ import Geolocation from '@react-native-community/geolocation';
 import { useAuth } from '../../context/AuthContext';
 import sosService from '../../services/sosService';
 import hospitalService from '../../services/hospitalService';
+import { SOCKET_URL } from '../../config';
+
 import type { Emergency, Hospital } from '../../types';
 
 export function UserHomeScreen({ navigation }: any) {
@@ -106,10 +108,10 @@ export function UserHomeScreen({ navigation }: any) {
 
     // 3. Real-time Status Updates via Socket
     if (user?.id) {
-      const SOCKET_URL = 'http://localhost:5000'; // Should match backend
       const socket = require('socket.io-client').io(SOCKET_URL, {
         transports: ['websocket']
       });
+
 
       socket.on('connect', () => {
         socket.emit('join_user', user.id);

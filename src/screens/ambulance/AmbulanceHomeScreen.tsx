@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal,
-  ActivityIndicator, Alert, StatusBar, ScrollView
+  ActivityIndicator, Alert, StatusBar, ScrollView, Linking, TextInput
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -9,6 +9,8 @@ import Geolocation from '@react-native-community/geolocation';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from '../../context/AuthContext';
 import sosService from '../../services/sosService';
+import { SOCKET_URL } from '../../config';
+
 import type { Emergency } from '../../types';
 
 export function AmbulanceHomeScreen({ navigation }: any) {
@@ -19,6 +21,9 @@ export function AmbulanceHomeScreen({ navigation }: any) {
   const [pendingPopup, setPendingPopup] = useState<Emergency | null>(null);
   const [countdown, setCountdown] = useState(30);
   const [loading, setLoading] = useState(false);
+  const [otpInput, setOtpInput] = useState('');
+  const [showOtpModal, setShowOtpModal] = useState(false);
+
   const socketRef = React.useRef<Socket | null>(null);
 
   // Socket setup for real-time SOS alerts
@@ -26,9 +31,10 @@ export function AmbulanceHomeScreen({ navigation }: any) {
     if (!driver?.id) return;
 
     // Connect to backend socket
-    const socket = io('http://localhost:5000', {
+    const socket = io(SOCKET_URL, {
       transports: ['websocket']
     });
+
     socketRef.current = socket;
 
     socket.on('connect', () => {
@@ -156,21 +162,28 @@ export function AmbulanceHomeScreen({ navigation }: any) {
 
   const handleComplete = async () => {
     if (!activeEmergency) return;
-    Alert.alert('Complete Trip', 'Mark this emergency as completed?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Complete', onPress: async () => {
-          try {
-            await sosService.completeEmergency(activeEmergency._id);
-            setActiveEmergency(null);
-            setIsAvailable(true);
-            await sosService.updateAmbulanceStatus(driver!.id, { isAvailable: true });
-            Alert.alert('✅ Done', 'Emergency completed. You are now available.');
-          } catch { Alert.alert('Error', 'Could not complete.'); }
-        }
-      }
-    ]);
+
+    if (otpInput !== activeEmergency.pickupOTP) {
+        Alert.alert('Invalid OTP', 'The verification code does not match. Please ask the patient for the correct code.');
+        return;
+    }
+
+    try {
+      setLoading(true);
+      await sosService.completeEmergency(activeEmergency._id, otpInput);
+      setActiveEmergency(null);
+
+      setOtpInput('');
+      setIsAvailable(true);
+      await sosService.updateAmbulanceStatus(driver!.id, { isAvailable: true });
+      Alert.alert('✅ Done', 'Emergency completed. You are now available.');
+    } catch { 
+      Alert.alert('Error', 'Could not complete emergency. Please try again.'); 
+    } finally {
+      setLoading(false);
+    }
   };
+
 
   const statusColor = !isOnline ? '#555' : isAvailable ? '#27AE60' : '#F39C12';
   const statusLabel = !isOnline ? 'Offline' : isAvailable ? 'Available' : 'Unavailable';
@@ -204,7 +217,18 @@ export function AmbulanceHomeScreen({ navigation }: any) {
                       <Text style={styles.modalVal}>→ {pendingPopup.hospitalName}</Text>
                     </View>
                   )}
+                  <View style={styles.modalRow}>
+                    <Icon name="account" size={18} color="#888" />
+                    <Text style={styles.modalVal}>{pendingPopup.userName || 'Unknown Patient'}</Text>
+                  </View>
+                  {pendingPopup.userEmergencyContact && (
+                    <View style={styles.modalRow}>
+                      <Icon name="phone-alert" size={18} color="#E67E22" />
+                      <Text style={[styles.modalVal, { color: '#E67E22' }]}>Contact: {pendingPopup.userEmergencyContact}</Text>
+                    </View>
+                  )}
                   <View style={[styles.severityBadge, { backgroundColor: '#C0392B20' }]}>
+
                     <Text style={[styles.severityText, { color: '#C0392B' }]}>
                       {(pendingPopup.severity || 'critical').toUpperCase()} EMERGENCY
                     </Text>
@@ -221,6 +245,45 @@ export function AmbulanceHomeScreen({ navigation }: any) {
                 </View>
               </>
             )}
+          </View>
+        </View>
+      </Modal>
+      
+      {/* OTP Verification Modal */}
+      <Modal transparent visible={showOtpModal} animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.otpModalCard}>
+            <Text style={styles.otpModalTitle}>Verify Patient OTP</Text>
+            <Text style={styles.otpModalSub}>Ask the patient for the 4-digit code shown on their screen.</Text>
+            
+            <TextInput
+              style={styles.otpInput}
+              placeholder="0000"
+              placeholderTextColor="#444"
+              keyboardType="number-pad"
+              maxLength={4}
+              value={otpInput}
+              onChangeText={setOtpInput}
+              autoFocus
+            />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={styles.declineBtn} 
+                onPress={() => { setShowOtpModal(false); setOtpInput(''); }}
+              >
+                <Text style={styles.declineBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.acceptBtn, { backgroundColor: '#27AE60' }]} 
+                onPress={() => {
+                  setShowOtpModal(false);
+                  handleComplete();
+                }}
+              >
+                <Text style={styles.acceptBtnText}>Verify & Complete</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -279,7 +342,35 @@ export function AmbulanceHomeScreen({ navigation }: any) {
                 <Text style={styles.activeVal}>{activeEmergency.hospitalName}</Text>
               </View>
             )}
+            <View style={styles.activeRow}>
+              <Icon name="account" size={16} color="#888" />
+              <Text style={styles.activeVal}>{activeEmergency.userName} · {activeEmergency.userPhone}</Text>
+            </View>
+            <View style={styles.activeRow}>
+              <Icon name="phone-alert" size={16} color="#E67E22" />
+              <Text style={[styles.activeVal, { color: '#E67E22' }]}>Emergency: {activeEmergency.userEmergencyContact}</Text>
+            </View>
+
+            <View style={styles.otpSection}>
+              <Text style={styles.otpLabel}>Verify Patient OTP to Complete:</Text>
+              <View style={styles.otpContainer}>
+                {[0, 1, 2, 3].map((i) => (
+                  <View key={i} style={styles.otpDot}>
+                     <Text style={styles.otpDotText}>{otpInput[i] || '•'}</Text>
+                  </View>
+                ))}
+              </View>
+              <TouchableOpacity style={styles.otpInputTrigger} onPress={() => setShowOtpModal(true)}>
+                <Text style={styles.otpInputTriggerText}>Enter Verification Code</Text>
+              </TouchableOpacity>
+            </View>
+
             <View style={styles.activeActions}>
+              <TouchableOpacity
+                style={styles.callPatientBtn}
+                onPress={() => activeEmergency.userPhone && Linking.openURL(`tel:${activeEmergency.userPhone}`)}>
+                <Icon name="phone" size={18} color="#fff" />
+              </TouchableOpacity>
               <TouchableOpacity
                 style={styles.navigateBtn}
                 onPress={() => navigation.navigate('AmbulanceNav', { emergency: activeEmergency })}>
@@ -348,6 +439,10 @@ const styles = StyleSheet.create({
     gap: 6, backgroundColor: '#27AE60', borderRadius: 10, paddingVertical: 10
   },
   completeBtnText: { color: '#fff', fontWeight: '600', fontSize: 14 },
+  callPatientBtn: {
+    width: 44, height: 44, borderRadius: 10,
+    backgroundColor: '#E67E22', alignItems: 'center', justifyContent: 'center'
+  },
   hospitalCard: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: '#1A1A1A', borderRadius: 12, padding: 14
@@ -382,4 +477,22 @@ const styles = StyleSheet.create({
     paddingVertical: 14, alignItems: 'center'
   },
   acceptBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  otpModalCard: {
+    backgroundColor: '#1A1A1A', borderRadius: 24, padding: 24, width: '85%',
+    borderWidth: 1, borderColor: '#333', alignSelf: 'center', marginBottom: '20%'
+  },
+  otpModalTitle: { fontSize: 20, fontWeight: '800', color: '#fff', textAlign: 'center', marginBottom: 8 },
+  otpModalSub: { fontSize: 13, color: '#888', textAlign: 'center', marginBottom: 24 },
+  otpInput: {
+    backgroundColor: '#0D0D0D', borderRadius: 12, height: 60,
+    fontSize: 28, fontWeight: '800', color: '#fff', textAlign: 'center',
+    letterSpacing: 10, marginBottom: 24, borderWidth: 1, borderColor: '#333'
+  },
+  otpSection: { marginBottom: 15 },
+  otpLabel: { fontSize: 12, fontWeight: '600', color: '#888', marginBottom: 10 },
+  otpContainer: { flexDirection: 'row', gap: 10, marginBottom: 15 },
+  otpDot: { width: 44, height: 44, borderRadius: 10, backgroundColor: '#2A2A2A', alignItems: 'center', justifyContent: 'center' },
+  otpDotText: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  otpInputTrigger: { backgroundColor: '#C0392B20', paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
+  otpInputTriggerText: { color: '#C0392B', fontWeight: '700', fontSize: 13 },
 });

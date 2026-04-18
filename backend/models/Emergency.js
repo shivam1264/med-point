@@ -5,6 +5,8 @@ const emergencySchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   userName: { type: String },
   userPhone: { type: String },
+  userEmergencyContact: { type: String },
+  pickupOTP: { type: String },
   
   // Location of patient
   location: {

@@ -7,7 +7,8 @@ import { io, Socket } from 'socket.io-client';
 import sosService from '../../services/sosService';
 import mapService, { RoutePoint } from '../../services/mapService';
 
-const SOCKET_URL = 'http://localhost:5000';
+import { SOCKET_URL } from '../../config';
+
 
 interface Location { lat: number; lng: number; }
 
@@ -194,7 +195,13 @@ export function UserEmergencyTrackScreen({ route, navigation }: any) {
               <Text style={styles.driverName}>{emergency.ambulanceDriverName}</Text>
               <Text style={styles.driverSub}>{emergency.ambulanceVehicleNumber}</Text>
             </View>
+            <View style={{flex: 1}} />
+            <View style={styles.otpBadge}>
+               <Text style={styles.otpLabel}>OTP</Text>
+               <Text style={styles.otpValue}>{emergency.pickupOTP || '----'}</Text>
+            </View>
           </View>
+
         )}
 
         {emergency.hospitalName && (

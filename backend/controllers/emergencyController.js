@@ -1,6 +1,8 @@
 const Emergency = require('../models/Emergency');
 const Ambulance = require('../models/Ambulance');
 const Hospital = require('../models/Hospital');
+const User = require('../models/User');
+
 
 // Helper: calculate distance in km between two coordinates
 const getDistanceKm = (lat1, lng1, lat2, lng2) => {
@@ -18,10 +20,12 @@ const getDistanceKm = (lat1, lng1, lat2, lng2) => {
 // POST /api/sos — User triggers SOS
 const triggerSOS = async (req, res) => {
   try {
-    const { lat, lng, address, hospitalId } = req.body;
+    const { lat, lng, hospitalId, address } = req.body;
     const userId = req.user.id;
+    const user = await User.findById(userId);
 
     if (!lat || !lng) {
+
       return res.status(400).json({ success: false, message: 'Location required' });
     }
 
@@ -55,8 +59,13 @@ const triggerSOS = async (req, res) => {
     // Prepare emergency data
     const emergencyData = {
       user: userId,
+      userName: user?.name,
+      userPhone: user?.phone,
+      userEmergencyContact: user?.emergencyContact?.phone ? `${user.emergencyContact.name} (${user.emergencyContact.phone})` : 'None',
+      pickupOTP: Math.floor(1000 + Math.random() * 9000).toString(),
       location: { type: 'Point', coordinates: [lng, lat], address: address || 'Location detected by GPS' },
     };
+
 
     if (hospitalId) {
       // Targeted Hospital
@@ -141,8 +150,12 @@ const triggerSOS = async (req, res) => {
           location: emergency.location,
           hospitalName: emergency.hospitalName,
           userId,
+          userName: emergency.userName,
+          userPhone: emergency.userPhone,
+          emergencyContact: emergency.userEmergencyContact,
           message: 'New SOS Alert! Patient needs help.'
         });
+
       });
     }
 
@@ -273,12 +286,19 @@ const declineEmergency = async (req, res) => {
 // PATCH /api/emergencies/:id/complete
 const completeEmergency = async (req, res) => {
   try {
-    const emergency = await Emergency.findByIdAndUpdate(
-      req.params.id,
-      { status: 'completed', completedAt: new Date() },
-      { new: true }
-    );
+    const { otp } = req.body;
+    const emergency = await Emergency.findById(req.params.id);
+    
     if (!emergency) return res.status(404).json({ success: false, message: 'Emergency not found' });
+    
+    if (emergency.pickupOTP && emergency.pickupOTP !== otp) {
+      return res.status(400).json({ success: false, message: 'Invalid Verification OTP' });
+    }
+
+    emergency.status = 'completed';
+    emergency.completedAt = new Date();
+    await emergency.save();
+
 
     // Notify user via Socket.io
     if (req.io) {

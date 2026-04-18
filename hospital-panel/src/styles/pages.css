@@ -121,6 +121,16 @@ code.driver-id { background: #C0392B22; color: #C0392B; padding: 3px 8px; border
 .filter-tab.active { background: #C0392B; border-color: #C0392B; color: #fff; }
 .filter-count { background: #fff; color: #C0392B; border-radius: 10px; padding: 0 6px; font-size: 10px; font-weight: 800; }
 
+/* ── Dashboard Trends ── */
+.trend-section { margin-bottom: 32px; }
+.trend-card { background: #1A1A1A; border: 1px solid #2A2A2A; border-radius: 14px; padding: 24px; display: flex; gap: 32px; align-items: center; }
+.chart-placeholder { flex: 2; position: relative; }
+.chart-labels { display: flex; justify-content: space-between; margin-top: 8px; font-size: 10px; color: #555; font-family: monospace; }
+.trend-info { flex: 1; display: flex; flex-direction: column; gap: 16px; border-left: 1px solid #2A2A2A; padding-left: 32px; }
+.trend-stat { display: flex; flex-direction: column; gap: 4px; }
+.trend-stat span { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: .5px; }
+.trend-stat strong { font-size: 18px; color: #EAEAEA; }
+
 /* ── Toast ── */
 .toast { position: fixed; bottom: 24px; right: 24px; z-index: 999; background: #1A1A1A; border: 1px solid #2A2A2A; border-radius: 10px; padding: 12px 20px; font-size: 14px; color: #EAEAEA; box-shadow: 0 8px 24px rgba(0,0,0,.5); animation: slideUp .3s ease; }
 @keyframes slideUp { from{transform:translateY(16px);opacity:0} to{transform:translateY(0);opacity:1} }

@@ -66,6 +66,33 @@ export default function Dashboard() {
         ))}
       </div>
 
+      <div className="trend-section">
+        <h2 className="section-heading">Hourly SOS Insights</h2>
+        <div className="trend-card">
+          <div className="chart-placeholder">
+            <svg width="100%" height="160" viewBox="0 0 400 160" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#C0392B" stopOpacity={0.3} />
+                  <stop offset="100%" stopColor="#C0392B" stopOpacity={0} />
+                </linearGradient>
+
+              </defs>
+              <path d="M0,140 L50,110 L100,120 L150,60 L200,90 L250,40 L300,70 L350,20 L400,50 L400,160 L0,160 Z" fill="url(#grad)" />
+              <path d="M0,140 L50,110 L100,120 L150,60 L200,90 L250,40 L300,70 L350,20 L400,50" fill="none" stroke="#C0392B" strokeWidth="3" strokeLinecap="round" />
+            </svg>
+            <div className="chart-labels">
+              <span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>23:59</span>
+            </div>
+          </div>
+          <div className="trend-info">
+             <div className="trend-stat"><span>High Volume Peak</span><strong>14:00 - 16:00</strong></div>
+             <div className="trend-stat"><span>Avg Response Time</span><strong>{loading ? '--' : '4.2m'}</strong></div>
+          </div>
+        </div>
+      </div>
+
+
       <h2 className="section-heading">Recent Emergencies</h2>
       <div className="table-card">
         {recentEmergencies.length === 0 ? (
@@ -81,8 +108,12 @@ export default function Dashboard() {
                   <td>{new Date(e.createdAt).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}</td>
                   <td>{e.user?.name || 'Anonymous'}<br /><small>{e.user?.phone}</small></td>
                   <td><span className={`badge ${statusBadge(e.status)}`}>{e.status}</span></td>
-                  <td>{e.ambulance?.vehicleNumber || '—'}</td>
+                  <td>
+                    {e.ambulance?.vehicleNumber || '—'}<br />
+                    <small style={{ color: '#E67E22' }}>{e.userEmergencyContact ? 'Contact: ' + e.userEmergencyContact : ''}</small>
+                  </td>
                   <td>{e.hospitalName || '—'}</td>
+
                 </tr>
               ))}
             </tbody>

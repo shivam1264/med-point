@@ -78,6 +78,8 @@ export interface Emergency {
   user?: string;
   userName?: string;
   userPhone?: string;
+  userEmergencyContact?: string;
+  pickupOTP?: string;
   location: { type: 'Point'; coordinates: [number, number]; address?: string };
   ambulanceDriverName?: string;
   ambulanceVehicleNumber?: string;
